@@ -53,11 +53,27 @@ export default function App() {
   const [passwordInput, setPasswordInput] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  // Autenticación específica para Personal LAV
+  const [employeeAuth, setEmployeeAuth] = useState(false);
+  const [employeePasswordInput, setEmployeePasswordInput] = useState('');
+  const [showEmployeeAuthModal, setShowEmployeeAuthModal] = useState(false);
+  const [employeeAuthError, setEmployeeAuthError] = useState('');
+
   const handleAdminAccess = (viewName) => {
     if (adminAuth) {
       setCurrentView(viewName);
     } else {
       setShowAuthModal(true);
+    }
+  };
+
+  const handleEmployeeAccess = () => {
+    if (employeeAuth || adminAuth) {
+      setCurrentView('employee');
+    } else {
+      setEmployeePasswordInput('');
+      setEmployeeAuthError('');
+      setShowEmployeeAuthModal(true);
     }
   };
 
@@ -71,6 +87,21 @@ export default function App() {
       setPasswordInput('');
     } else {
       alert('Contraseña incorrecta. (Prueba: aj2026 o 1234)');
+    }
+  };
+
+  const handleEmployeeLogin = (e) => {
+    e.preventDefault();
+    const cleanPass = employeePasswordInput.trim();
+    // Clave requerida por el usuario: 'lav2026' (además de llaves maestras de admin)
+    if (cleanPass === 'lav2026' || cleanPass === 'aj2026' || cleanPass === '1234') {
+      setEmployeeAuth(true);
+      setShowEmployeeAuthModal(false);
+      setCurrentView('employee');
+      setEmployeePasswordInput('');
+      setEmployeeAuthError('');
+    } else {
+      setEmployeeAuthError('Contraseña incorrecta. La clave es lav2026');
     }
   };
 
@@ -120,14 +151,14 @@ export default function App() {
               </button>
 
               <button
-                onClick={() => setCurrentView('employee')}
+                onClick={handleEmployeeAccess}
                 className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                   currentView === 'employee'
                     ? 'bg-blue-600 text-white shadow-sm font-extrabold'
                     : 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70'
                 }`}
               >
-                <BookOpen size={14} /> 📝 Cuaderno Empleada
+                <BookOpen size={14} /> Personal LAV
               </button>
 
               <button
@@ -246,6 +277,59 @@ export default function App() {
                   <button
                     type="submit"
                     className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase"
+                  >
+                    Ingresar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Acceso para Personal LAV (Clave: lav2026) */}
+        {showEmployeeAuthModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-3xl bg-white p-6 border border-blue-200 shadow-2xl animate-in fade-in zoom-in duration-150">
+              <div className="text-center mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-2 border border-blue-100">
+                  <BookOpen size={24} />
+                </div>
+                <h3 className="text-lg font-black text-slate-900">Personal LAV</h3>
+                <p className="text-xs text-slate-500">Ingresa la clave de acceso de personal para abrir la estación de trabajo</p>
+              </div>
+
+              <form onSubmit={handleEmployeeLogin} className="space-y-4">
+                <div>
+                  <input
+                    type="password"
+                    required
+                    autoFocus
+                    value={employeePasswordInput}
+                    onChange={(e) => {
+                      setEmployeePasswordInput(e.target.value);
+                      if (employeeAuthError) setEmployeeAuthError('');
+                    }}
+                    placeholder="Contraseña (ej. lav2026)"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-center text-slate-900 focus:outline-none focus:border-blue-500 tracking-widest text-lg font-mono"
+                  />
+                  {employeeAuthError && (
+                    <p className="text-rose-600 text-xs text-center font-bold mt-2">
+                      {employeeAuthError}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowEmployeeAuthModal(false)}
+                    className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase shadow-md shadow-blue-500/20"
                   >
                     Ingresar
                   </button>

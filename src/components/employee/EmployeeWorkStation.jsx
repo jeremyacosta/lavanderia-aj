@@ -250,7 +250,7 @@ export default function EmployeeWorkStation() {
       dineroEntregadoBs: parseFloat(dineroEntregadoBs) || 0,
       dineroEntregadoUSD: parseFloat(dineroEntregadoUSD) || 0,
       notes: closureNotes.trim(),
-      closedBy: 'Encargada / Empleada'
+      closedBy: 'Personal LAV'
     });
     setClosureSuccessAlert(true);
     setTimeout(() => setClosureSuccessAlert(false), 4000);
@@ -259,18 +259,22 @@ export default function EmployeeWorkStation() {
   // Generar mensaje de WhatsApp para el cierre del día
   const generateClosureWhatsApp = () => {
     const lines = [];
-    lines.push(`📊 *CIERRE DIARIO - LAVANDERÍA AJ (${selectedDate})*`);
+    lines.push(`🧼 *CIERRE DE CAJA DIARIO - LAVANDERÍA AJ*`);
+    lines.push(`📅 *Fecha:* ${selectedDate}`);
+    lines.push(`🕒 *Generado:* ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+    lines.push('----------------------------------------');
+    lines.push(`💵 *Total Cobrado USD:* $${totalCobradoUSD.toFixed(2)}`);
+    lines.push(`🇻🇪 *Total Cobrado Bs:* Bs. ${totalCobradoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`);
     lines.push('');
-    lines.push(`💰 *Total Cobrado:* $${totalCobradoUSD.toFixed(2)} USD (~Bs. ${totalCobradoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })})`);
-    lines.push(`📱 *Pago Móvil / Transf:* Bs. ${totalPagoMovilBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ($${totalPagoMovilUSD.toFixed(2)})`);
-    lines.push(`💵 *Divisas Efectivo:* $${totalEfectivoUSD.toFixed(2)} USD`);
-    lines.push(`🇻🇪 *Efectivo en Bs:* Bs. ${totalEfectivoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`);
+    lines.push(`📲 *Pago Móvil:* Bs. ${totalPagoMovilBs.toLocaleString('es-VE')} ($${totalPagoMovilUSD.toFixed(2)})`);
+    lines.push(`💵 *Efectivo Divisas ($):* $${totalEfectivoUSD.toFixed(2)} USD`);
+    lines.push(`💵 *Efectivo Bolívares:* Bs. ${totalEfectivoBs.toLocaleString('es-VE')} ($${totalEfectivoBsEnUSD.toFixed(2)})`);
     lines.push('');
     lines.push(`🏦 *Fondo Recibido:* Bs. ${parseFloat(fondoInicialBs || 0).toLocaleString('es-VE')}`);
     lines.push(`🤝 *Dinero Entregado:* Bs. ${parseFloat(dineroEntregadoBs || 0).toLocaleString('es-VE')} y $${parseFloat(dineroEntregadoUSD || 0).toFixed(2)} USD`);
     if (closureNotes) lines.push(`📝 *Notas:* ${closureNotes}`);
     lines.push('');
-    lines.push('Enviado desde el Sistema PWA Oficial - Lavandería AJ');
+    lines.push('Enviado desde el Sistema PWA Oficial - Lavandería AJ (Personal LAV)');
 
     return encodeURIComponent(lines.join('\n'));
   };
@@ -281,12 +285,12 @@ export default function EmployeeWorkStation() {
   return (
     <div className="space-y-6">
       
-      {/* Top Banner de Empleada */}
+      {/* Top Banner de Personal LAV */}
       <div className="rounded-3xl bg-gradient-to-r from-blue-900 via-blue-950 to-slate-900 p-6 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-blue-800">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2 border border-cyan-500/30">
             <BookOpen size={14} className="text-cyan-400" />
-            <span>Puesto de Trabajo · Cuaderno Diario</span>
+            <span>Puesto de Trabajo · Personal LAV</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
             Gestión Diaria de Clientes y Caja
