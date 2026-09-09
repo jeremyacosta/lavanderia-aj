@@ -5,13 +5,14 @@ import {
   Clock, AlertCircle, Trash2, Check, DollarSign, 
   Sparkles, X, ShieldAlert, FileText, Share2, 
   Package, Droplets, CheckSquare, Layers, Lock, 
-  Calendar, Eye, Phone, RefreshCw
+  Calendar, Eye, Phone, RefreshCw, Smartphone, ArrowRight
 } from 'lucide-react';
 
 export default function EmployeeWorkStation() {
   const { 
     dailyRecords, 
     addDailyRecord, 
+    updateDailyRecord,
     markRecordDelivered, 
     markRecordPaid, 
     deleteRecordWithAudit, 
@@ -26,8 +27,20 @@ export default function EmployeeWorkStation() {
   const [activeTab, setActiveTab] = useState('daily_log'); // 'daily_log' | 'stored_clothes' | 'detergents' | 'closure'
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [originFilter, setOriginFilter] = useState('all'); // 'all' | 'walk_in' | 'app'
 
-  // Estado del Formulario de Carga Rápida
+  // Modal para recepcionar y ajustar pedidos que llegaron de la App
+  const [intakeModalOpen, setIntakeModalOpen] = useState(false);
+  const [recordForIntake, setRecordForIntake] = useState(null);
+  const [intakeBaskets, setIntakeBaskets] = useState(1);
+  const [intakeBleach, setIntakeBleach] = useState(0);
+  const [intakeDegreaser, setIntakeDegreaser] = useState(0);
+  const [intakePaymentStatus, setIntakePaymentStatus] = useState('paid');
+  const [intakePaymentMethod, setIntakePaymentMethod] = useState('pago_movil');
+  const [intakeBankRef, setIntakeBankRef] = useState('');
+  const [intakeNotes, setIntakeNotes] = useState('');
+
+  // Estado del Formulario de Carga Rápida (Mostrador)
   const [showAddModal, setShowAddModal] = useState(false);
   const [time, setTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
   const [customerName, setCustomerName] = useState('');
@@ -141,6 +154,8 @@ export default function EmployeeWorkStation() {
       paymentMethod,
       bankReference: bankReference.trim(),
       deliveryStatus: 'in_store',
+      origin: 'walk_in',
+      intakeStatus: 'confirmed',
       notes: notes.trim()
     });
 
@@ -165,6 +180,123 @@ export default function EmployeeWorkStation() {
     setNotes('');
     setPaymentStatus('paid');
     setMarkedNewDetergent(false);
+  };
+
+  // Botones de presets rápidos para mostrador
+  const applyPreset = (presetName) => {
+    if (presetName === 'combo1') {
+      setWashCount(1);
+      setDryCount(1);
+      setSoapCount(1);
+      setLaborCount(1);
+      setSoftenerCount(1);
+      setBleachCount(0);
+      setDegreaserCount(0);
+      setManualTotalUSD('7.50');
+      setNotes('1 Cesta Completa Combo ($7.50)');
+    } else if (presetName === 'combo2') {
+      setWashCount(2);
+      setDryCount(2);
+      setSoapCount(2);
+      setLaborCount(2);
+      setSoftenerCount(2);
+      setBleachCount(0);
+      setDegreaserCount(0);
+      setManualTotalUSD('15.00');
+      setNotes('2 Cestas Completas Combo ($15.00)');
+    } else if (presetName === 'lavado_jabon') {
+      setWashCount(1);
+      setDryCount(0);
+      setSoapCount(1);
+      setLaborCount(1);
+      setSoftenerCount(0);
+      setBleachCount(0);
+      setDegreaserCount(0);
+      setManualTotalUSD('4.50');
+      setNotes('Solo Lavado + Jabón ($4.50)');
+    } else if (presetName === 'edredon_ind') {
+      setWashCount(1);
+      setDryCount(1);
+      setSoapCount(1);
+      setLaborCount(1);
+      setSoftenerCount(1);
+      setManualTotalUSD('10.00');
+      setNotes('Edredón Individual ($10.00)');
+    } else if (presetName === 'edredon_mat') {
+      setWashCount(1);
+      setDryCount(1);
+      setSoapCount(1);
+      setLaborCount(1);
+      setSoftenerCount(1);
+      setManualTotalUSD('12.00');
+      setNotes('Edredón Matrimonial ($12.00)');
+    } else if (presetName === 'edredon_grande') {
+      setWashCount(1);
+      setDryCount(1);
+      setSoapCount(1);
+      setLaborCount(1);
+      setSoftenerCount(1);
+      setManualTotalUSD('14.00');
+      setNotes('Edredón Matrimonial Grande ($14.00)');
+    } else if (presetName === 'forros_bus') {
+      setWashCount(4);
+      setDryCount(4);
+      setSoapCount(4);
+      setLaborCount(4);
+      setSoftenerCount(4);
+      setManualTotalUSD('32.00');
+      setNotes('Forros de Autobús completos con bolsas ($32.00)');
+    }
+  };
+
+  // Abrir modal de recepción para pedidos desde la App
+  const openIntakeModal = (rec) => {
+    setRecordForIntake(rec);
+    setIntakeBaskets(rec.washCount || 1);
+    setIntakeBleach(rec.bleachCount || 0);
+    setIntakeDegreaser(rec.degreaserCount || 0);
+    setIntakePaymentStatus(rec.paymentStatus || 'paid');
+    setIntakePaymentMethod(rec.paymentMethod || 'pago_movil');
+    setIntakeBankRef(rec.bankReference && rec.bankReference !== 'Pedido por App' && rec.bankReference !== 'Pedido Web' ? rec.bankReference : '');
+    setIntakeNotes(rec.notes || '');
+    setIntakeModalOpen(true);
+  };
+
+  // Confirmar recepción física de prendas y ajustar cestas si pesaron más/menos
+  const handleConfirmIntake = (e) => {
+    e.preventDefault();
+    if (!recordForIntake) return;
+
+    let unitPrice = prices.comboFull || 7.50;
+    let adjustedTotalUSD = (intakeBaskets * unitPrice) + (intakeBleach * 0.50) + (intakeDegreaser * 0.50);
+    let adjustedTotalBs = adjustedTotalUSD * (exchangeRate || 40.50);
+
+    let paidUSD = intakePaymentStatus === 'paid' ? adjustedTotalUSD : 0;
+    let debtUSD = intakePaymentStatus === 'paid' ? 0 : adjustedTotalUSD;
+
+    updateDailyRecord(recordForIntake.id, {
+      washCount: intakeBaskets,
+      dryCount: intakeBaskets,
+      soapCount: intakeBaskets,
+      laborCount: intakeBaskets,
+      softenerCount: intakeBaskets,
+      bleachCount: intakeBleach,
+      degreaserCount: intakeDegreaser,
+      totalUSD: adjustedTotalUSD,
+      totalBs: adjustedTotalBs,
+      amountPaidUSD: paidUSD,
+      amountPaidBs: paidUSD * (exchangeRate || 40.50),
+      debtUSD: debtUSD,
+      paymentStatus: intakePaymentStatus,
+      paymentMethod: intakePaymentMethod,
+      bankReference: intakeBankRef.trim() || (intakePaymentMethod === 'usd_cash' ? 'Efectivo $' : 'Pendiente'),
+      intakeStatus: 'confirmed',
+      notes: `${intakeNotes} · [Mostrador: ${intakeBaskets} cesta(s) verificadas]`
+    });
+
+    setIntakeModalOpen(false);
+    setRecordForIntake(null);
+    alert('✅ Recepción de prendas y ajuste de cestas guardado en el cuaderno diario.');
   };
 
   // Manejador para Borrado Protegido con Auditoría
@@ -218,6 +350,16 @@ export default function EmployeeWorkStation() {
     (r.bankReference && r.bankReference.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (r.notes && r.notes.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const appOrdersCount = recordsOfSelectedDate.filter(r => r.origin === 'app').length;
+  const pendingAppOrdersCount = recordsOfSelectedDate.filter(r => r.origin === 'app' && r.intakeStatus === 'pending_intake').length;
+  const walkInCount = recordsOfSelectedDate.filter(r => r.origin !== 'app').length;
+
+  const filteredByOrigin = searchedRecords.filter(r => {
+    if (originFilter === 'app') return r.origin === 'app';
+    if (originFilter === 'walk_in') return r.origin !== 'app';
+    return true;
+  });
 
   // Estadísticas del Cierre Diario de la fecha seleccionada
   const totalCobradoUSD = recordsOfSelectedDate.reduce((acc, r) => acc + (r.amountPaidUSD || 0), 0);
@@ -309,10 +451,38 @@ export default function EmployeeWorkStation() {
             className="px-5 py-3 rounded-2xl bg-blue-500 hover:bg-blue-400 text-white font-extrabold text-sm shadow-md transition-all flex items-center gap-2 active:scale-95"
           >
             <Plus size={18} />
-            <span>Anotar Nuevo Cliente</span>
+            <span>Anotar Cliente en Mostrador</span>
           </button>
         </div>
       </div>
+
+      {/* BANNER DE AVISO: PEDIDOS RECIBIDOS DESDE LA APP WEB */}
+      {pendingAppOrdersCount > 0 && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 text-white shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-blue-500/40 animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 shadow-inner">
+              <Smartphone size={22} className="text-cyan-200" />
+            </div>
+            <div>
+              <p className="font-black text-sm sm:text-base flex items-center gap-2">
+                <span>¡Hay {pendingAppOrdersCount} pedido(s) recibido(s) desde la App Web esperando ropa!</span>
+              </p>
+              <p className="text-xs text-blue-100 mt-0.5">
+                Los clientes cotizaron sus prendas desde la app. Cuando lleguen al mostrador, presiona <strong>"⚖️ Recibir Ropa / Ajustar"</strong> para verificar las cestas y confirmar.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setActiveTab('daily_log');
+              setOriginFilter('app');
+            }}
+            className="px-4 py-2 rounded-xl bg-white text-blue-800 font-black text-xs uppercase shadow-sm hover:bg-blue-50 transition-all shrink-0 active:scale-95"
+          >
+            Ver Pedidos de la App ({pendingAppOrdersCount})
+          </button>
+        </div>
+      )}
 
       {/* Selector de Pestañas Principales */}
       <div className="flex flex-wrap items-center gap-2 border-b border-blue-200/80 pb-3">
@@ -369,22 +539,62 @@ export default function EmployeeWorkStation() {
       {activeTab === 'daily_log' && (
         <div className="space-y-4">
           
-          {/* Barra de Filtros */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-blue-100 shadow-xs">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                <Calendar size={15} className="text-blue-600" />
-                Fecha del Cuaderno:
-              </span>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-blue-200 text-xs font-bold text-slate-900 bg-blue-50/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          {/* Barra de Filtros de Fecha, Origen y Búsqueda */}
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-blue-100 shadow-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                  <Calendar size={15} className="text-blue-600" />
+                  Fecha:
+                </span>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl border border-blue-200 text-xs font-bold text-slate-900 bg-blue-50/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Botones de Filtro por Origen (Mostrador vs App) */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setOriginFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    originFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Todos ({recordsOfSelectedDate.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOriginFilter('walk_in')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    originFilter === 'walk_in'
+                      ? 'bg-white text-slate-900 shadow-xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🏢 Mostrador ({walkInCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOriginFilter('app')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                    originFilter === 'app'
+                      ? 'bg-blue-600 text-white shadow-xs font-black'
+                      : 'text-blue-700 hover:text-blue-900'
+                  }`}
+                >
+                  <Smartphone size={12} />
+                  <span>App ({appOrdersCount})</span>
+                </button>
+              </div>
             </div>
 
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full lg:w-64">
               <Search size={15} className="absolute left-3 top-2.5 text-slate-400" />
               <input
                 type="text"
@@ -403,7 +613,7 @@ export default function EmployeeWorkStation() {
                 <thead className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-extrabold uppercase tracking-wider">
                   <tr>
                     <th className="py-3 px-3">Hora</th>
-                    <th className="py-3 px-4">Cliente</th>
+                    <th className="py-3 px-4">Cliente / Origen</th>
                     <th className="py-3 px-2 text-center">Lav</th>
                     <th className="py-3 px-2 text-center">Sec</th>
                     <th className="py-3 px-2 text-center">Jab</th>
@@ -418,14 +628,25 @@ export default function EmployeeWorkStation() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {searchedRecords.length > 0 ? (
-                    searchedRecords.map((rec) => (
+                  {filteredByOrigin.length > 0 ? (
+                    filteredByOrigin.map((rec) => (
                       <tr key={rec.id} className="hover:bg-blue-50/40 transition-colors">
                         <td className="py-3 px-3 font-mono font-bold text-slate-600 whitespace-nowrap">
                           {rec.time}
                         </td>
                         <td className="py-3 px-4">
-                          <p className="font-extrabold text-slate-900 text-sm">{rec.customerName}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-extrabold text-slate-900 text-sm">{rec.customerName}</p>
+                            {rec.origin === 'app' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
+                                <Smartphone size={10} /> App
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-500 bg-slate-100 shrink-0">
+                                Mostrador
+                              </span>
+                            )}
+                          </div>
                           {rec.customerPhone && (
                             <p className="text-[10px] text-slate-500 font-mono">{rec.customerPhone}</p>
                           )}
@@ -433,6 +654,14 @@ export default function EmployeeWorkStation() {
                             <p className="text-[10px] text-amber-700 font-medium italic mt-0.5">
                               {rec.notes}
                             </p>
+                          )}
+                          {rec.origin === 'app' && rec.intakeStatus === 'pending_intake' && (
+                            <button
+                              onClick={() => openIntakeModal(rec)}
+                              className="mt-1.5 px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-transform active:scale-95 animate-pulse"
+                            >
+                              <span>⚖️ Recibir Ropa / Ajustar Cestas</span>
+                            </button>
                           )}
                         </td>
                         <td className="py-3 px-2 text-center font-bold text-slate-800">{rec.washCount || 0}</td>
@@ -861,9 +1090,68 @@ export default function EmployeeWorkStation() {
                 </div>
               </div>
 
+              {/* Atajos Rápidos de Servicios Frecuentes */}
+              <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-1.5">
+                <span className="text-[11px] font-black text-blue-900 uppercase tracking-wide flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-amber-500" />
+                  Atajos Rápidos (Carga en 1 Clic):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button 
+                    type="button" 
+                    onClick={() => applyPreset('combo1')} 
+                    className="px-2.5 py-1 rounded-xl bg-white hover:bg-blue-600 hover:text-white text-blue-900 text-xs font-bold border border-blue-200 shadow-xs transition-colors"
+                  >
+                    🧺 1 Cesta ($7.50)
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => applyPreset('combo2')} 
+                    className="px-2.5 py-1 rounded-xl bg-white hover:bg-blue-600 hover:text-white text-blue-900 text-xs font-bold border border-blue-200 shadow-xs transition-colors"
+                  >
+                    🧺🧺 2 Cestas ($15.00)
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => applyPreset('lavado_jabon')} 
+                    className="px-2.5 py-1 rounded-xl bg-white hover:bg-blue-600 hover:text-white text-blue-900 text-xs font-bold border border-blue-200 shadow-xs transition-colors"
+                  >
+                    🫧 Lavado + Jabón ($4.50)
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => applyPreset('edredon_ind')} 
+                    className="px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-600 hover:text-white text-indigo-900 text-xs font-bold border border-indigo-200 shadow-xs transition-colors"
+                  >
+                    🛏️ Edredón Ind. ($10)
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => applyPreset('edredon_mat')} 
+                    className="px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-600 hover:text-white text-indigo-900 text-xs font-bold border border-indigo-200 shadow-xs transition-colors"
+                  >
+                    🛏️ Edredón Mat. ($12)
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => applyPreset('edredon_grande')} 
+                    className="px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-600 hover:text-white text-indigo-900 text-xs font-bold border border-indigo-200 shadow-xs transition-colors"
+                  >
+                    🛏️ Edredón Grande ($14)
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => applyPreset('forros_bus')} 
+                    className="px-2.5 py-1 rounded-xl bg-white hover:bg-cyan-600 hover:text-white text-cyan-900 text-xs font-bold border border-cyan-200 shadow-xs transition-colors"
+                  >
+                    🚌 Forros Bus ($32)
+                  </button>
+                </div>
+              </div>
+
               {/* Botones de Servicios / Cestas */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Cantidades de Servicios por Cesta:</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Cantidades de Servicios por Cesta (Personalizable):</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                   {[
                     { label: 'Lavado', val: washCount, setter: setWashCount },
@@ -1170,6 +1458,178 @@ export default function EmployeeWorkStation() {
                   className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md"
                 >
                   Confirmar Cobro y Entrega
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: RECEPCIÓN Y AJUSTE DE PRENDAS PARA PEDIDOS DESDE LA APP */}
+      {intakeModalOpen && recordForIntake && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 border border-blue-200 shadow-2xl animate-in fade-in zoom-in duration-150 text-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold border border-amber-200">
+                  <Smartphone size={20} />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Recepción de Ropa · Pedido desde la App</h3>
+                  <p className="text-xs text-slate-500">
+                    Cliente: <strong>{recordForIntake.customerName}</strong> {recordForIntake.customerPhone ? `(${recordForIntake.customerPhone})` : ''}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIntakeModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50/80 rounded-2xl border border-amber-200/80 text-xs text-amber-900 mb-4 flex items-start gap-2">
+              <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <span>
+                <strong>Nota del operario:</strong> Verifica la cantidad real de cestas al pesar la ropa del cliente y ajusta si es necesario.
+              </span>
+            </div>
+
+            <form onSubmit={handleConfirmIntake} className="space-y-4">
+              {/* Ajuste de Cestas */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                <div>
+                  <p className="font-extrabold text-sm text-slate-900">Cestas de Ropa Recibidas:</p>
+                  <p className="text-[11px] text-slate-500">
+                    Cotizó en la app: {recordForIntake.washCount} cesta(s) (~$7.50 c/u)
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setIntakeBaskets(Math.max(1, intakeBaskets - 1))}
+                    className="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 font-bold hover:bg-blue-600 hover:text-white flex items-center justify-center"
+                  >
+                    -
+                  </button>
+                  <span className="w-8 text-center font-black text-lg font-mono text-slate-900">
+                    {intakeBaskets}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIntakeBaskets(intakeBaskets + 1)}
+                    className="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 font-bold hover:bg-blue-600 hover:text-white flex items-center justify-center"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Insumos adicionales */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="text-xs font-bold text-slate-700 block mb-1">Cloro (+$0.50):</span>
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setIntakeBleach(Math.max(0, intakeBleach - 1))}
+                      className="w-7 h-7 rounded bg-white border border-slate-200 font-bold"
+                    >-</button>
+                    <span className="font-bold text-sm">{intakeBleach}</span>
+                    <button
+                      type="button"
+                      onClick={() => setIntakeBleach(intakeBleach + 1)}
+                      className="w-7 h-7 rounded bg-white border border-slate-200 font-bold"
+                    >+</button>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="text-xs font-bold text-slate-700 block mb-1">Desengrasante (+$0.50):</span>
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setIntakeDegreaser(Math.max(0, intakeDegreaser - 1))}
+                      className="w-7 h-7 rounded bg-white border border-slate-200 font-bold"
+                    >-</button>
+                    <span className="font-bold text-sm">{intakeDegreaser}</span>
+                    <button
+                      type="button"
+                      onClick={() => setIntakeDegreaser(intakeDegreaser + 1)}
+                      className="w-7 h-7 rounded bg-white border border-slate-200 font-bold"
+                    >+</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Monto Final Recalculado */}
+              <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-blue-900 block">Monto Total Ajustado:</span>
+                  <span className="text-[11px] text-blue-700">
+                    ≈ Bs. {(((intakeBaskets * (prices.comboFull || 7.50)) + (intakeBleach * 0.50) + (intakeDegreaser * 0.50)) * (exchangeRate || 40.50)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="text-2xl font-black font-mono text-blue-950">
+                  ${((intakeBaskets * (prices.comboFull || 7.50)) + (intakeBleach * 0.50) + (intakeDegreaser * 0.50)).toFixed(2)} USD
+                </div>
+              </div>
+
+              {/* Estado y Método de Pago */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Cobro:</label>
+                  <select
+                    value={intakePaymentStatus}
+                    onChange={(e) => setIntakePaymentStatus(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-slate-50"
+                  >
+                    <option value="paid">✓ Cancela Ahora Completo</option>
+                    <option value="pending">⏳ Deja Ropa (Paga al retirar)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Método de Pago:</label>
+                  <select
+                    value={intakePaymentMethod}
+                    onChange={(e) => setIntakePaymentMethod(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-slate-50"
+                  >
+                    <option value="pago_movil">📱 Pago Móvil</option>
+                    <option value="usd_cash">💵 Efectivo USD ($)</option>
+                    <option value="bs_cash">🇻🇪 Efectivo Bs</option>
+                    <option value="transfer">🏦 Transferencia Bancaria</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Referencia Bancaria (si canceló):</label>
+                <input
+                  type="text"
+                  value={intakeBankRef}
+                  onChange={(e) => setIntakeBankRef(e.target.value)}
+                  placeholder="Ej: RF 4589"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIntakeModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase shadow-md flex items-center gap-1.5"
+                >
+                  <Check size={16} />
+                  <span>Confirmar Recepción y Guardar</span>
                 </button>
               </div>
             </form>

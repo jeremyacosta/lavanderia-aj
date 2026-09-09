@@ -3,11 +3,18 @@ import { useApp } from '../../context/AppContext';
 import { 
   Calculator, Plus, Minus, Sparkles, 
   MessageCircle, ArrowRight, RefreshCw, CheckCircle2,
-  Info, AlertTriangle, ShieldCheck
+  Info, AlertTriangle, ShieldCheck, Send, Check, X
 } from 'lucide-react';
 
 export default function BasketCalculator() {
-  const { prices, exchangeRate } = useApp();
+  const { prices, exchangeRate, addDailyRecord } = useApp();
+
+  // Modal para enviar pedido automático a la encargada / Personal LAV
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [orderSentSuccess, setOrderSentSuccess] = useState(false);
+  const [sentOrderDetails, setSentOrderDetails] = useState(null);
 
   // Cantidad de prendas del cliente
   const [pants, setPants] = useState(0);         // ~5 pantalones = 1 cesta (~1.2 kg c/u)
@@ -194,6 +201,48 @@ export default function BasketCalculator() {
     lines.push('¿Tienen disponibilidad para recibirme hoy? ¡Muchas gracias!');
 
     return encodeURIComponent(lines.join('\n'));
+  };
+
+  const handleSendAppOrder = (e) => {
+    e.preventDefault();
+    if (!clientName.trim()) {
+      alert('Por favor ingresa tu nombre para que la encargada te identifique.');
+      return;
+    }
+
+    const createdRecord = addDailyRecord({
+      customerName: clientName.trim(),
+      customerPhone: clientPhone.trim() || 'Portal Web',
+      washCount: effectiveBaskets,
+      dryCount: (basePlan === 'washWithSoap' && basePlan !== 'custom') ? 0 : effectiveBaskets,
+      soapCount: effectiveBaskets,
+      laborCount: effectiveBaskets,
+      softenerCount: (basePlan === 'comboFull' && basePlan !== 'custom') ? effectiveBaskets : 0,
+      bleachCount: addBleach ? 1 : 0,
+      degreaserCount: addDegreaser ? 1 : 0,
+      totalUSD: totalUSD,
+      totalBs: totalBs,
+      amountPaidUSD: 0,
+      amountPaidBs: 0,
+      debtUSD: totalUSD,
+      paymentStatus: 'pending',
+      paymentMethod: 'pago_movil',
+      bankReference: 'Pedido por App',
+      deliveryStatus: 'in_store',
+      origin: 'app',
+      intakeStatus: 'pending_intake',
+      notes: `📲 Pedido desde la App: ${useDirectBaskets ? `${directBaskets} cestas` : `${totalClothesCount} prendas (~${effectiveBaskets} cestas)`}${totalComfortersCount > 0 ? ` + ${totalComfortersCount} edredón(es)` : ''} · ${planTitleSummary}`
+    });
+
+    setSentOrderDetails({
+      id: createdRecord.id,
+      name: clientName.trim(),
+      totalUSD,
+      totalBs,
+      baskets: effectiveBaskets
+    });
+    setOrderSentSuccess(true);
+    setShowOrderModal(false);
   };
 
   return (
@@ -764,6 +813,22 @@ export default function BasketCalculator() {
               </span>
             </div>
 
+            {/* AVISO DE PEDIDO ENVIADO CON ÉXITO A PERSONAL LAV */}
+            {orderSentSuccess && sentOrderDetails && (
+              <div className="mt-3 p-3.5 rounded-2xl bg-emerald-500/20 border border-emerald-400 text-emerald-100 flex items-start gap-3">
+                <CheckCircle2 size={22} className="text-emerald-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <h4 className="font-black text-xs text-emerald-300">¡Pedido Enviado a la Pantalla de la Encargada!</h4>
+                  <p className="text-[11px]">
+                    Tu orden por <strong>${sentOrderDetails.totalUSD.toFixed(2)} USD</strong> ya aparece automáticamente en el panel <strong>Personal LAV</strong> a nombre de <strong>{sentOrderDetails.name}</strong>.
+                  </p>
+                  <p className="text-[10px] text-emerald-200/70">
+                    Al llegar al local, indícale a la operaria tu nombre para recepcionar tus prendas.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {totalUSD === 0 ? (
               <p key="summary-zero-tip" className="text-[11px] text-cyan-300 font-semibold">
                 👆 Ingresa prendas o edredones arriba para calcular tu monto estimado.
@@ -771,29 +836,138 @@ export default function BasketCalculator() {
             ) : null}
           </div>
 
-          {/* Botón WhatsApp */}
-          <div className="w-full lg:w-auto shrink-0 flex flex-col items-center gap-2">
+          {/* Botones de Acción */}
+          <div className="w-full lg:w-auto shrink-0 flex flex-col items-center gap-2.5">
+            <button 
+              type="button"
+              onClick={() => {
+                if (totalUSD === 0) {
+                  alert('Agrega al menos una cesta o prenda antes de enviar tu pedido.');
+                  return;
+                }
+                setShowOrderModal(true);
+              }}
+              disabled={totalUSD === 0}
+              className={`w-full sm:w-auto px-7 py-3.5 rounded-2xl font-black text-sm uppercase tracking-wide flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${
+                totalUSD > 0
+                  ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-blue-900/30 ring-2 ring-blue-400/50'
+                  : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <Send size={18} />
+              <span>Enviar Pedido a Lavandería</span>
+              <ArrowRight size={18} />
+            </button>
+
             <a 
               href={`https://wa.me/584126701633?text=${generateWhatsAppMessage()}`} 
               target="_blank" 
               rel="noopener noreferrer" 
-              className={`w-full sm:w-auto px-7 py-4 rounded-2xl font-black text-sm uppercase tracking-wide flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${
-                totalUSD > 0
-                  ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-900/30 ring-2 ring-emerald-400/50'
-                  : 'bg-slate-700 text-slate-300 cursor-not-allowed pointer-events-none'
+              className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-extrabold text-xs tracking-wide flex items-center justify-center gap-2 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 transition-colors ${
+                totalUSD === 0 ? 'pointer-events-none opacity-40' : ''
               }`}
             >
-              <MessageCircle size={20} className="text-white" />
-              <span>Cotizar por WhatsApp</span>
-              <ArrowRight size={18} />
+              <MessageCircle size={16} className="text-emerald-400" />
+              <span>Cotizar / Notificar por WhatsApp</span>
             </a>
-            <span className="text-[11px] text-slate-300 font-medium">
+
+            <span className="text-[11px] text-slate-400 font-medium">
               Atención directa: <strong>0412-6701633</strong>
             </span>
           </div>
 
         </div>
       </div>
+
+      {/* MODAL: INGRESAR NOMBRE DEL CLIENTE PARA ENVIAR PEDIDO A PERSONAL LAV */}
+      {showOrderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 border border-blue-200 shadow-2xl animate-in fade-in zoom-in duration-150 text-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                  <Send size={18} />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Enviar Pedido al Sistema</h3>
+                  <p className="text-[11px] text-slate-500">Llegará directo a la pantalla de la encargada</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowOrderModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-xs text-blue-950 space-y-1">
+              <div className="flex justify-between font-bold">
+                <span>Total Estimado:</span>
+                <span className="text-blue-700 font-mono font-black text-sm">${totalUSD.toFixed(2)} USD</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                {effectiveBaskets > 0 && `• ${effectiveBaskets} cesta(s) (${planTitleSummary})`}
+                {totalComfortersCount > 0 && ` • ${totalComfortersCount} edredón(es)`}
+              </p>
+            </div>
+
+            <form onSubmit={handleSendAppOrder} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tu Nombre o Apodo *:
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="Ej: Albert, Jenny, Familia Pérez..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Teléfono de Contacto (Opcional):
+                </label>
+                <input
+                  type="tel"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  placeholder="Ej: 0412-1234567"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
+                <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  No te preocupes por pagar ahora: puedes cancelar al entregar o al retirar tu ropa en mostrador.
+                </span>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowOrderModal(false)}
+                  className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Check size={16} />
+                  <span>Confirmar Pedido</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
