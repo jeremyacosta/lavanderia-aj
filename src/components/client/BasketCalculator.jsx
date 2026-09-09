@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { 
   Calculator, Plus, Minus, Sparkles, 
   MessageCircle, ArrowRight, RefreshCw, CheckCircle2,
-  AlertCircle, HelpCircle, Info
+  Info
 } from 'lucide-react';
 
 export default function BasketCalculator() {
@@ -13,9 +13,9 @@ export default function BasketCalculator() {
   const [pants, setPants] = useState(0);         // ~5 pantalones = 1 cesta (~1.2 kg c/u)
   const [shirts, setShirts] = useState(0);       // ~12 franelas = 1 cesta (~0.5 kg c/u)
   const [towels, setTowels] = useState(0);       // ~3.5 toallas = 1 cesta (~1.6 kg c/u)
-  const [mixedClothes, setMixedClothes] = useState(0); // ~16 prendas ligeras/ropa variada = 1 cesta (~0.375 kg c/u)
+  const [mixedClothes, setMixedClothes] = useState(0); // ~16 prendas variadas = 1 cesta (~0.375 kg c/u)
 
-  // Edredones (se cobran por unidad y tamaño)
+  // Edredones (cobro por pieza individual según tamaño)
   const [comforterSingle, setComforterSingle] = useState(0);     // $10
   const [comforterDouble, setComforterDouble] = useState(0);     // $12
   const [comforterLarge, setComforterLarge] = useState(0);       // $14
@@ -24,11 +24,10 @@ export default function BasketCalculator() {
   const [directBaskets, setDirectBaskets] = useState(1);
   const [useDirectBaskets, setUseDirectBaskets] = useState(false);
 
-  // Selección de servicios para la ropa ordinaria
-  // Presets: 'comboFull' ($7.50), 'washWithSoap' ($4.50), 'custom'
+  // Modo de servicio: 'comboFull' ($7.50), 'washWithSoap' ($4.50), 'custom'
   const [serviceMode, setServiceMode] = useState('comboFull');
 
-  // Opciones de servicios individuales
+  // Opciones individuales
   const [serviceWash, setServiceWash] = useState(true);          // $4.00
   const [serviceDry, setServiceDry] = useState(true);            // $3.00
   const [serviceSoap, setServiceSoap] = useState(true);          // $0.50
@@ -36,7 +35,6 @@ export default function BasketCalculator() {
   const [serviceBleach, setServiceBleach] = useState(false);     // $0.50
   const [serviceLabor, setServiceLabor] = useState(true);        // $0.20
 
-  // Manejador de cambio de Preset
   const handlePresetChange = (mode) => {
     setServiceMode(mode);
     if (mode === 'comboFull') {
@@ -56,13 +54,12 @@ export default function BasketCalculator() {
     }
   };
 
-  // Conmutador de servicio manual (pasa automáticamente a modo personalizado)
   const toggleCustomService = (setter, currentValue) => {
     setter(!currentValue);
     setServiceMode('custom');
   };
 
-  // Cálculo de Cestas Estimadas a partir de las prendas
+  // Cálculos de prendas y peso
   const totalClothesCount = pants + shirts + towels + mixedClothes;
 
   const totalWeightApprox = 
@@ -71,10 +68,8 @@ export default function BasketCalculator() {
     (towels * 1.6) + 
     (mixedClothes * 0.375);
 
-  // Cada cesta equivale en promedio a 6 kg de ropa seca (rango 5 a 7 kg)
   const BASKET_CAPACITY_KG = 6.0;
 
-  // Cestas requeridas por prendas: si hay 0 prendas, son 0 cestas
   const calculatedBaskets = totalClothesCount > 0 
     ? Math.max(1, Math.ceil(totalWeightApprox / BASKET_CAPACITY_KG)) 
     : 0;
@@ -83,7 +78,6 @@ export default function BasketCalculator() {
     ? directBaskets 
     : calculatedBaskets;
 
-  // Lógica de llenado de la cesta actual (en porcentaje y kg restantes)
   const weightInCurrentBasket = totalWeightApprox > 0
     ? (totalWeightApprox % BASKET_CAPACITY_KG === 0 ? BASKET_CAPACITY_KG : (totalWeightApprox % BASKET_CAPACITY_KG))
     : 0;
@@ -94,7 +88,7 @@ export default function BasketCalculator() {
 
   const remainingKgInBasket = Math.max(0, BASKET_CAPACITY_KG - weightInCurrentBasket);
 
-  // Precio unitario por cesta según servicios seleccionados
+  // Precio unitario por cesta
   let basketUnitPrice = 0;
   if (serviceMode === 'comboFull') {
     basketUnitPrice = prices.comboFull || 7.50;
@@ -111,21 +105,19 @@ export default function BasketCalculator() {
     basketUnitPrice = customSum;
   }
 
-  // Costo por cestas de ropa
+  // Subtotales
   const subtotalClothes = effectiveBaskets * basketUnitPrice;
 
-  // Costo por Edredones
   const totalComfortersCount = comforterSingle + comforterDouble + comforterLarge;
   const subtotalComforters = 
     (comforterSingle * (prices.comforterSingle || 10.00)) +
     (comforterDouble * (prices.comforterDouble || 12.00)) +
     (comforterLarge * (prices.comforterMatrimonialLarge || 14.00));
 
-  // TOTAL ESTIMADO
   const totalUSD = subtotalClothes + subtotalComforters;
-  const totalBs = totalUSD * exchangeRate;
+  const safeRate = exchangeRate || 40.50;
+  const totalBs = totalUSD * safeRate;
 
-  // Reset general
   const handleReset = () => {
     setPants(0);
     setShirts(0);
@@ -139,7 +131,6 @@ export default function BasketCalculator() {
     handlePresetChange('comboFull');
   };
 
-  // Generar mensaje detallado para WhatsApp
   const generateWhatsAppMessage = () => {
     const lines = [];
     lines.push('🧺 *SOLICITUD DE COTIZACIÓN - LAVANDERÍA AJ*');
@@ -201,7 +192,7 @@ export default function BasketCalculator() {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider mb-2 border border-blue-200">
             <Calculator size={14} className="text-blue-600" />
-            Simulador Inteligente de Cestas y Prendas
+            <span>Simulador Inteligente de Cestas y Prendas</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             Calcula tu Presupuesto al Instante
@@ -220,7 +211,7 @@ export default function BasketCalculator() {
                 : 'bg-blue-50/80 text-blue-900 border-blue-200 hover:bg-blue-100'
             }`}
           >
-            {useDirectBaskets ? '🧺 Modo: Cestas Directas' : '👕 Modo: Por Prendas'}
+            <span>{useDirectBaskets ? '🧺 Modo: Cestas Directas' : '👕 Modo: Por Prendas'}</span>
           </button>
           <button
             onClick={handleReset}
@@ -238,7 +229,7 @@ export default function BasketCalculator() {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</span>
-            {useDirectBaskets ? 'Indica tus Cestas de Ropa:' : 'Ingresa la Cantidad de tus Prendas:'}
+            <span>{useDirectBaskets ? 'Indica tus Cestas de Ropa:' : 'Ingresa la Cantidad de tus Prendas:'}</span>
           </h3>
           <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
             1 Cesta = 5 a 7 kg en seco (~6 kg promedio)
@@ -246,7 +237,7 @@ export default function BasketCalculator() {
         </div>
 
         {useDirectBaskets ? (
-          <div className="p-6 rounded-2xl bg-blue-50/50 border border-blue-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div key="direct-baskets-mode" className="p-6 rounded-2xl bg-blue-50/50 border border-blue-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
               <p className="font-bold text-slate-900 text-sm">¿Cuántas cestas completas vas a lavar?</p>
               <p className="text-xs text-slate-500">Capacidad estándar de 5 a 7 kilos en seco por cesta.</p>
@@ -270,7 +261,7 @@ export default function BasketCalculator() {
             </div>
           </div>
         ) : (
-          <div>
+          <div key="garments-mode">
             {/* Grid de prendas ordinarias */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               
@@ -289,13 +280,9 @@ export default function BasketCalculator() {
                   >
                     <Minus size={14} />
                   </button>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    value={pants} 
-                    onChange={(e) => setPants(Math.max(0, parseInt(e.target.value) || 0))} 
-                    className="w-12 text-center font-black text-base text-slate-900 focus:outline-none" 
-                  />
+                  <span className="w-12 text-center font-black text-base text-slate-900 select-none">
+                    {pants}
+                  </span>
                   <button 
                     onClick={() => setPants(pants + 1)} 
                     className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold active:scale-95"
@@ -320,13 +307,9 @@ export default function BasketCalculator() {
                   >
                     <Minus size={14} />
                   </button>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    value={shirts} 
-                    onChange={(e) => setShirts(Math.max(0, parseInt(e.target.value) || 0))} 
-                    className="w-12 text-center font-black text-base text-slate-900 focus:outline-none" 
-                  />
+                  <span className="w-12 text-center font-black text-base text-slate-900 select-none">
+                    {shirts}
+                  </span>
                   <button 
                     onClick={() => setShirts(shirts + 1)} 
                     className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold active:scale-95"
@@ -351,13 +334,9 @@ export default function BasketCalculator() {
                   >
                     <Minus size={14} />
                   </button>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    value={towels} 
-                    onChange={(e) => setTowels(Math.max(0, parseInt(e.target.value) || 0))} 
-                    className="w-12 text-center font-black text-base text-slate-900 focus:outline-none" 
-                  />
+                  <span className="w-12 text-center font-black text-base text-slate-900 select-none">
+                    {towels}
+                  </span>
                   <button 
                     onClick={() => setTowels(towels + 1)} 
                     className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold active:scale-95"
@@ -382,13 +361,9 @@ export default function BasketCalculator() {
                   >
                     <Minus size={14} />
                   </button>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    value={mixedClothes} 
-                    onChange={(e) => setMixedClothes(Math.max(0, parseInt(e.target.value) || 0))} 
-                    className="w-12 text-center font-black text-base text-slate-900 focus:outline-none" 
-                  />
+                  <span className="w-12 text-center font-black text-base text-slate-900 select-none">
+                    {mixedClothes}
+                  </span>
                   <button 
                     onClick={() => setMixedClothes(mixedClothes + 1)} 
                     className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold active:scale-95"
@@ -446,7 +421,7 @@ export default function BasketCalculator() {
 
             {/* BARRA DE CAPACIDAD Y LLENADO EN VIVO */}
             {totalClothesCount > 0 ? (
-              <div className="mt-4 p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-2">
+              <div key="basket-progress-bar" className="mt-4 p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-2">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[11px]">
@@ -456,7 +431,7 @@ export default function BasketCalculator() {
                       {effectiveBaskets === 1 ? '1 Cesta Requerida' : `${effectiveBaskets} Cestas Requeridas`}
                     </span>
                     <span className="text-slate-500 font-medium">
-                      ({totalClothesCount} prendas • ~{totalWeightApprox.toFixed(1)} kg totales)
+                      ({totalClothesCount} prendas • ~{totalWeightApprox.toFixed(1)} kg)
                     </span>
                   </div>
                   <div className="text-blue-800 font-bold">
@@ -476,17 +451,17 @@ export default function BasketCalculator() {
 
                 <div className="flex items-center justify-between text-[11px] text-slate-600">
                   <span>
-                    💡 <strong>Capacidad de cesta:</strong> Se cobra por cesta de 5 a 7 kg.
+                    💡 Capacidad de cesta: Se cobra por cesta de 5 a 7 kg.
                   </span>
-                  {remainingKgInBasket > 0 && (
+                  {remainingKgInBasket > 0 ? (
                     <span className="text-emerald-700 font-bold">
                       ¡Puedes meter ~{remainingKgInBasket.toFixed(1)} kg más en esta cesta sin pagar extra!
                     </span>
-                  )}
+                  ) : null}
                 </div>
               </div>
             ) : (
-              <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs flex items-center gap-2">
+              <div key="basket-empty-tip" className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs flex items-center gap-2">
                 <Info size={16} className="text-blue-500 shrink-0" />
                 <span>Usa los botones <strong>+</strong> para indicar tus prendas y verás cómo se va llenando tu cesta en tiempo real.</span>
               </div>
@@ -500,7 +475,7 @@ export default function BasketCalculator() {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">2</span>
-            Elige los Servicios para tu Ropa:
+            <span>Elige los Servicios para tu Ropa:</span>
           </h3>
           <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
             Tarifa actual: <strong className="text-blue-900">${basketUnitPrice.toFixed(2)}</strong> / cesta
@@ -633,13 +608,14 @@ export default function BasketCalculator() {
           {/* Desglose dinámico del resumen */}
           <div className="space-y-3 w-full lg:w-auto">
             <div className="flex items-center gap-2 text-cyan-400 text-xs font-black uppercase tracking-wider">
-              <Sparkles size={16} /> Resumen Detallado de tu Cotización
+              <Sparkles size={16} />
+              <span>Resumen Detallado de tu Cotización</span>
             </div>
 
             <div className="space-y-1.5 text-xs text-slate-200">
               {/* Línea de Ropa ordinaria */}
               {effectiveBaskets > 0 ? (
-                <div className="flex items-center justify-between lg:justify-start gap-4">
+                <div key="summary-baskets-row" className="flex items-center justify-between lg:justify-start gap-4">
                   <span className="text-slate-300">
                     🧺 <strong>{effectiveBaskets} Cesta(s)</strong> de ropa:
                   </span>
@@ -648,14 +624,14 @@ export default function BasketCalculator() {
                   </span>
                 </div>
               ) : (
-                <div className="text-slate-400">
+                <div key="summary-no-baskets-row" className="text-slate-400">
                   🧺 <em>No has agregado cestas de ropa ordinaria.</em>
                 </div>
               )}
 
               {/* Línea de Edredones */}
-              {totalComfortersCount > 0 && (
-                <div className="flex items-center justify-between lg:justify-start gap-4">
+              {totalComfortersCount > 0 ? (
+                <div key="summary-comforters-row" className="flex items-center justify-between lg:justify-start gap-4">
                   <span className="text-slate-300">
                     🛏️ <strong>{totalComfortersCount} Edredón(es)</strong>:
                   </span>
@@ -663,14 +639,14 @@ export default function BasketCalculator() {
                     +${subtotalComforters.toFixed(2)} USD
                   </span>
                 </div>
-              )}
+              ) : null}
 
               {/* Plan activo */}
-              {effectiveBaskets > 0 && (
-                <div className="text-[11px] text-cyan-200/90 pt-1">
+              {effectiveBaskets > 0 ? (
+                <div key="summary-plan-name" className="text-[11px] text-cyan-200/90 pt-1">
                   Plan: {serviceMode === 'comboFull' ? '⭐ Combo Estrella VIP ($7.50)' : serviceMode === 'washWithSoap' ? '💧 Lavado + Jabón ($4.50)' : '🛠️ Personalizado'}
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Total General Grande */}
@@ -683,11 +659,11 @@ export default function BasketCalculator() {
               </div>
             </div>
 
-            {totalUSD === 0 && (
-              <p className="text-[11px] text-amber-300 font-semibold">
+            {totalUSD === 0 ? (
+              <p key="summary-zero-tip" className="text-[11px] text-amber-300 font-semibold">
                 👆 Ingresa prendas o edredones arriba para calcular tu monto exacto.
               </p>
-            )}
+            ) : null}
           </div>
 
           {/* Botón WhatsApp */}

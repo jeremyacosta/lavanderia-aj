@@ -12,6 +12,39 @@ import {
   Wrench, DollarSign, Shield, Phone, Globe, ShieldAlert 
 } from 'lucide-react';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.warn('[ErrorBoundary captured error]', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200 text-slate-800 my-4 text-center">
+          <h3 className="font-black text-base text-amber-900 mb-1">Actualizando vista...</h3>
+          <p className="text-xs text-slate-600 mb-3">Presiona para restaurar el estado:</p>
+          <button
+            onClick={() => this.setState({ hasError: false })}
+            className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold shadow hover:bg-blue-700 transition-colors"
+          >
+            Recargar Simulador
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [currentView, setCurrentView] = useState('client'); // 'client' | 'admin_accounting' | 'admin_machines' | 'admin_crm'
   const [adminAuth, setAdminAuth] = useState(false);
@@ -123,25 +156,27 @@ export default function App() {
 
         {/* Main Content Area */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-          {currentView === 'client' && (
-            <>
-              {/* Header Status with opening hours */}
-              <HeaderStatus />
+          <ErrorBoundary>
+            {currentView === 'client' && (
+              <>
+                {/* Header Status with opening hours */}
+                <HeaderStatus />
 
-              {/* Basket Calculator with exact prices ($7.50 / $4.50 / etc) */}
-              <BasketCalculator />
+                {/* Basket Calculator with exact prices ($7.50 / $4.50 / etc) */}
+                <BasketCalculator />
 
-              {/* Comforters & Bus Covers */}
-              <ComforterAndBusSection />
+                {/* Comforters & Bus Covers */}
+                <ComforterAndBusSection />
 
-              {/* Promotions, Payment Methods, Schedule, FAQ */}
-              <PromoInfo />
-            </>
-          )}
+                {/* Promotions, Payment Methods, Schedule, FAQ */}
+                <PromoInfo />
+              </>
+            )}
 
-          {currentView === 'admin_accounting' && <AccountingDashboard />}
-          {currentView === 'admin_machines' && <MachineMaintenance />}
-          {currentView === 'admin_crm' && <CustomerCRM />}
+            {currentView === 'admin_accounting' && <AccountingDashboard />}
+            {currentView === 'admin_machines' && <MachineMaintenance />}
+            {currentView === 'admin_crm' && <CustomerCRM />}
+          </ErrorBoundary>
         </main>
 
         {/* Footer */}
