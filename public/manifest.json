@@ -1,0 +1,22 @@
+{
+  "name": "Lavandería AJ",
+  "short_name": "Lavandería AJ",
+  "description": "Sistema y catálogo oficial de Lavandería AJ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080E1E",
+  "theme_color": "#06B6D4",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/pwa-icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
