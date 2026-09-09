@@ -119,6 +119,210 @@ export function AppProvider({ children }) {
     localStorage.setItem('aj_orders', JSON.stringify(orders));
   }, [orders]);
 
+  // Cuaderno Diario de Operaciones (Registros de clientes cargados por empleada/administrador)
+  const [dailyRecords, setDailyRecords] = useState(() => {
+    const saved = localStorage.getItem('aj_daily_records');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'rec_101',
+        date: '2026-09-07',
+        time: '08:43 AM',
+        customerName: 'Jenny',
+        customerPhone: '04126701633',
+        washCount: 1,
+        dryCount: 1,
+        soapCount: 1,
+        laborCount: 1,
+        softenerCount: 1,
+        bleachCount: 1,
+        degreaserCount: 1,
+        totalUSD: 34.00,
+        totalBs: 2670.00,
+        amountPaidUSD: 34.00,
+        amountPaidBs: 2670.00,
+        debtUSD: 0,
+        paymentStatus: 'paid', // 'paid' | 'partial' | 'pending'
+        paymentMethod: 'pago_movil',
+        bankReference: 'RF 7423',
+        deliveryStatus: 'delivered', // 'in_store' | 'delivered'
+        deliveredDate: '2026-09-08',
+        notes: 'Pagó completo y retiró 08/09'
+      },
+      {
+        id: 'rec_102',
+        date: '2026-09-07',
+        time: '10:05 AM',
+        customerName: 'Albert',
+        customerPhone: '04140001122',
+        washCount: 2,
+        dryCount: 2,
+        soapCount: 2,
+        laborCount: 2,
+        softenerCount: 2,
+        bleachCount: 0,
+        degreaserCount: 0,
+        totalUSD: 15.00,
+        totalBs: 607.50,
+        amountPaidUSD: 13.35,
+        amountPaidBs: 540.00,
+        debtUSD: 1.65,
+        paymentStatus: 'partial',
+        paymentMethod: 'pago_movil',
+        bankReference: 'RF 13358',
+        deliveryStatus: 'in_store',
+        notes: 'Abono 12.400 Bs (13.35$). Restan 1.65$'
+      },
+      {
+        id: 'rec_103',
+        date: '2026-09-07',
+        time: '12:18 PM',
+        customerName: 'Abuela',
+        customerPhone: '04245558899',
+        washCount: 5,
+        dryCount: 5,
+        soapCount: 5,
+        laborCount: 5,
+        softenerCount: 5,
+        bleachCount: 0,
+        degreaserCount: 0,
+        totalUSD: 37.50,
+        totalBs: 1518.75,
+        amountPaidUSD: 9.00,
+        amountPaidBs: 364.50,
+        debtUSD: 28.50,
+        paymentStatus: 'partial',
+        paymentMethod: 'bs_cash',
+        bankReference: 'RF 4708',
+        deliveryStatus: 'in_store',
+        notes: 'Abono 19.000 Bs + 9$ en efectivo. Jeremy 4000 Bs'
+      },
+      {
+        id: 'rec_104',
+        date: '2026-09-07',
+        time: '01:28 PM',
+        customerName: 'Alonzo',
+        customerPhone: '04169994433',
+        washCount: 2,
+        dryCount: 2,
+        soapCount: 2,
+        laborCount: 2,
+        softenerCount: 2,
+        bleachCount: 0,
+        degreaserCount: 0,
+        totalUSD: 15.00,
+        totalBs: 607.50,
+        amountPaidUSD: 15.00,
+        amountPaidBs: 607.50,
+        debtUSD: 0,
+        paymentStatus: 'paid',
+        paymentMethod: 'usd_cash',
+        bankReference: 'Efectivo en mano',
+        deliveryStatus: 'delivered',
+        deliveredDate: '2026-09-08',
+        notes: 'Pagó al retirar el 08/09'
+      },
+      {
+        id: 'rec_105',
+        date: '2026-09-07',
+        time: '03:40 PM',
+        customerName: 'Enrique V.',
+        customerPhone: '04123332211',
+        washCount: 2,
+        dryCount: 2,
+        soapCount: 2,
+        laborCount: 2,
+        softenerCount: 0,
+        bleachCount: 0,
+        degreaserCount: 0,
+        totalUSD: 12.20,
+        totalBs: 494.10,
+        amountPaidUSD: 0,
+        amountPaidBs: 0,
+        debtUSD: 12.20,
+        paymentStatus: 'pending',
+        paymentMethod: 'por_definir',
+        bankReference: 'Pendiente',
+        deliveryStatus: 'in_store',
+        notes: 'Debe 12.20$ completo. Ropa dejada en depósito.'
+      },
+      {
+        id: 'rec_106',
+        date: '2026-09-07',
+        time: '04:15 PM',
+        customerName: 'Javier',
+        customerPhone: '04147778899',
+        washCount: 3,
+        dryCount: 3,
+        soapCount: 3,
+        laborCount: 3,
+        softenerCount: 3,
+        bleachCount: 0,
+        degreaserCount: 0,
+        totalUSD: 24.00,
+        totalBs: 972.00,
+        amountPaidUSD: 24.00,
+        amountPaidBs: 972.00,
+        debtUSD: 0,
+        paymentStatus: 'paid',
+        paymentMethod: 'pago_movil',
+        bankReference: 'RF 4432',
+        deliveryStatus: 'in_store',
+        notes: 'Pagado el 07/09 con RF 4432. Por retirar'
+      }
+    ];
+  });
+
+  // Registro de Apertura de Detergentes (Jabón nuevo, suavizante nuevo, etc.)
+  const [detergentLogs, setDetergentLogs] = useState(() => {
+    const saved = localStorage.getItem('aj_detergent_logs');
+    return saved ? JSON.parse(saved) : [
+      { id: 'det_1', date: '2026-09-07', time: '12:18 PM', item: 'Jabón', notes: 'Abierto en turno orden #rec_103 (Abuela)', employee: 'Encargada' },
+      { id: 'det_2', date: '2026-09-08', time: '09:30 AM', item: 'Suavizante', notes: 'Nuevo galón de suavizante floral', employee: 'Encargada' }
+    ];
+  });
+
+  // Historial de Cierres Diarios de Caja
+  const [dailyClosures, setDailyClosures] = useState(() => {
+    const saved = localStorage.getItem('aj_daily_closures');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'close_0709',
+        date: '2026-09-07',
+        closedAt: '2026-09-07 06:15 PM',
+        cobradoBs: 41920.00,
+        cobradoUSD: 47.60,
+        pagoMovilBs: 13800.00,
+        pagoMovilUSD: 15.60,
+        efectivoBs: 25100.00,
+        efectivoUSD: 28.50,
+        divisasEfectivoUSD: 3.50,
+        fondoInicialBs: 860.00,
+        dineroEntregadoBs: 850.00,
+        dineroEntregadoUSD: 20.00,
+        notes: 'Cierre del 07/09 según cuaderno físico',
+        closedBy: 'Encargada'
+      }
+    ];
+  });
+
+  // Registro Inmutable de Auditoría (Borrados y anulaciones con motivo y contraseña)
+  const [auditLogs, setAuditLogs] = useState(() => {
+    const saved = localStorage.getItem('aj_audit_logs');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'aud_sample_1',
+        timestamp: '2026-09-06 05:40 PM',
+        action: 'REGISTRO_INICIAL',
+        entityType: 'SISTEMA',
+        entityId: 'SYS',
+        reason: 'Activación del Módulo de Auditoría y Trazabilidad',
+        performedBy: 'Administrador (Jeremy / Saul)',
+        details: 'Protección de borrados habilitada con clave maestra.'
+      }
+    ];
+  });
+
+  // Persistir en LocalStorage
   useEffect(() => {
     localStorage.setItem('aj_expenses', JSON.stringify(expenses));
   }, [expenses]);
@@ -130,6 +334,22 @@ export function AppProvider({ children }) {
   useEffect(() => {
     localStorage.setItem('aj_maintenance_logs', JSON.stringify(maintenanceLogs));
   }, [maintenanceLogs]);
+
+  useEffect(() => {
+    localStorage.setItem('aj_daily_records', JSON.stringify(dailyRecords));
+  }, [dailyRecords]);
+
+  useEffect(() => {
+    localStorage.setItem('aj_detergent_logs', JSON.stringify(detergentLogs));
+  }, [detergentLogs]);
+
+  useEffect(() => {
+    localStorage.setItem('aj_daily_closures', JSON.stringify(dailyClosures));
+  }, [dailyClosures]);
+
+  useEffect(() => {
+    localStorage.setItem('aj_audit_logs', JSON.stringify(auditLogs));
+  }, [auditLogs]);
 
   // Funciones de gestión
   const addOrder = (newOrder) => {
@@ -211,6 +431,140 @@ export function AppProvider({ children }) {
     } : m));
   };
 
+  // --- MÉTODOS DEL CUADERNO DIARIO Y PANEL DE EMPLEADA ---
+  const addDailyRecord = (newRecord) => {
+    const nextId = `rec_${Date.now()}`;
+    const record = {
+      ...newRecord,
+      id: nextId,
+      date: newRecord.date || new Date().toISOString().split('T')[0],
+      time: newRecord.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      deliveryStatus: newRecord.deliveryStatus || 'in_store'
+    };
+    setDailyRecords([record, ...dailyRecords]);
+
+    // Si se incluye teléfono o nombre, sincronizar con clientes
+    if (newRecord.customerPhone) {
+      const existing = customers.find(c => c.phone.trim() === newRecord.customerPhone.trim());
+      if (existing) {
+        setCustomers(customers.map(c => c.phone.trim() === newRecord.customerPhone.trim() ? { ...c, visits: (c.visits || 1) + 1 } : c));
+      } else if (newRecord.customerName) {
+        setCustomers([{
+          id: `c_${Date.now()}`,
+          name: newRecord.customerName,
+          phone: newRecord.customerPhone,
+          visits: 1,
+          notes: 'Registrado desde el cuaderno diario'
+        }, ...customers]);
+      }
+    }
+
+    return record;
+  };
+
+  const updateDailyRecord = (id, updatedFields) => {
+    setDailyRecords(dailyRecords.map(r => r.id === id ? { ...r, ...updatedFields } : r));
+  };
+
+  const markRecordDelivered = (id) => {
+    setDailyRecords(dailyRecords.map(r => r.id === id ? { 
+      ...r, 
+      deliveryStatus: 'delivered',
+      deliveredDate: new Date().toISOString().split('T')[0]
+    } : r));
+  };
+
+  const markRecordPaid = (id, paymentData = {}) => {
+    setDailyRecords(dailyRecords.map(r => {
+      if (r.id === id) {
+        return {
+          ...r,
+          paymentStatus: 'paid',
+          amountPaidUSD: r.totalUSD,
+          amountPaidBs: r.totalBs,
+          debtUSD: 0,
+          paymentMethod: paymentData.paymentMethod || r.paymentMethod || 'usd_cash',
+          bankReference: paymentData.bankReference || r.bankReference || 'Pagado en mostrador',
+          notes: paymentData.notes ? `${r.notes ? r.notes + ' · ' : ''}${paymentData.notes}` : r.notes
+        };
+      }
+      return r;
+    }));
+  };
+
+  // Verificación de Contraseña Administrativa
+  const verifyAdminPassword = (password) => {
+    return password === 'aj2026' || password === '1234';
+  };
+
+  // Borrado Estrictamente Protegido con Contraseña Maestra y Motivo Obligatorio
+  const deleteRecordWithAudit = (id, adminPassword, reason, performedBy = 'Encargada / Empleada') => {
+    if (!verifyAdminPassword(adminPassword)) {
+      return { success: false, message: 'Contraseña de Administrador incorrecta. Operación no autorizada.' };
+    }
+
+    if (!reason || reason.trim().length < 4) {
+      return { success: false, message: 'Debes indicar el motivo detallado de la eliminación para el registro de auditoría.' };
+    }
+
+    const recordToDelete = dailyRecords.find(r => r.id === id);
+    if (!recordToDelete) {
+      return { success: false, message: 'Registro no encontrado.' };
+    }
+
+    // Crear entrada inmutable en la Auditoría del Administrador
+    const auditEntry = {
+      id: `aud_${Date.now()}`,
+      timestamp: `${new Date().toISOString().split('T')[0]} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+      action: 'ELIMINACIÓN_REGISTRO',
+      entityType: 'CUADERNO_DIARIO',
+      entityId: id,
+      reason: reason.trim(),
+      performedBy: performedBy,
+      recordSnapshot: {
+        cliente: recordToDelete.customerName,
+        montoUSD: recordToDelete.totalUSD,
+        montoBs: recordToDelete.totalBs,
+        fecha: recordToDelete.date,
+        hora: recordToDelete.time,
+        servicios: `L:${recordToDelete.washCount || 0} S:${recordToDelete.dryCount || 0} J:${recordToDelete.soapCount || 0} Suav:${recordToDelete.softenerCount || 0} Cl:${recordToDelete.bleachCount || 0} Des:${recordToDelete.degreaserCount || 0}`,
+        referencia: recordToDelete.bankReference || 'S/R',
+        estadoPago: recordToDelete.paymentStatus
+      }
+    };
+
+    setAuditLogs([auditEntry, ...auditLogs]);
+    setDailyRecords(dailyRecords.filter(r => r.id !== id));
+
+    return { success: true, message: 'Registro eliminado y registrado en la bitácora de auditoría del administrador.' };
+  };
+
+  // Apertura de Detergentes
+  const addDetergentLog = (item, notes = '', employee = 'Encargada') => {
+    const newLog = {
+      id: `det_${Date.now()}`,
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      item,
+      notes,
+      employee
+    };
+    setDetergentLogs([newLog, ...detergentLogs]);
+    return newLog;
+  };
+
+  // Guardar Cierre Diario de Caja
+  const saveDailyClosure = (closureData) => {
+    const newClosure = {
+      ...closureData,
+      id: `close_${Date.now()}`,
+      closedAt: `${new Date().toISOString().split('T')[0]} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+      date: closureData.date || new Date().toISOString().split('T')[0]
+    };
+    setDailyClosures([newClosure, ...dailyClosures]);
+    return newClosure;
+  };
+
   return (
     <AppContext.Provider value={{
       prices: INITIAL_PRICES,
@@ -221,12 +575,24 @@ export function AppProvider({ children }) {
       expenses,
       machines,
       maintenanceLogs,
+      dailyRecords,
+      detergentLogs,
+      dailyClosures,
+      auditLogs,
       addOrder,
       updateOrderStatus,
       updatePaymentStatus,
       addExpense,
       addMaintenanceLog,
-      updateMachineStatus
+      updateMachineStatus,
+      addDailyRecord,
+      updateDailyRecord,
+      markRecordDelivered,
+      markRecordPaid,
+      verifyAdminPassword,
+      deleteRecordWithAudit,
+      addDetergentLog,
+      saveDailyClosure
     }}>
       {children}
     </AppContext.Provider>

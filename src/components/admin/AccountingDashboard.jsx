@@ -3,16 +3,19 @@ import { useApp } from '../../context/AppContext';
 import { 
   TrendingUp, TrendingDown, DollarSign, Wallet, Percent, 
   Plus, CheckCircle2, Clock, MessageSquare, AlertCircle, 
-  Layers, ChevronRight, UserCheck, ArrowUpRight
+  Layers, ChevronRight, UserCheck, ArrowUpRight, ShieldAlert,
+  AlertTriangle, FileText, Package
 } from 'lucide-react';
 import OrderTicketModal from './OrderTicketModal';
 
 export default function AccountingDashboard() {
   const { 
     orders, expenses, exchangeRate, setExchangeRate, 
-    updateOrderStatus, updatePaymentStatus, addExpense 
+    updateOrderStatus, updatePaymentStatus, addExpense,
+    auditLogs, dailyClosures, detergentLogs, dailyRecords
   } = useApp();
 
+  const [adminTab, setAdminTab] = useState('metrics'); // 'metrics' | 'audit' | 'closures' | 'supplies'
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterPeriod, setFilterPeriod] = useState('all'); // 'today' | 'all'
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -88,7 +91,7 @@ export default function AccountingDashboard() {
             Panel de Administración & Contabilidad Diaria
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-            Control de Caja y Finanzas
+            Control de Caja, Finanzas y Auditoría
           </h2>
         </div>
 
@@ -135,180 +138,468 @@ export default function AccountingDashboard() {
         </div>
       </div>
 
-      {/* Financial Key Metrics (4 Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Total Ingresos Cobrados */}
-        <div className="rounded-3xl bg-white p-6 border border-blue-200/80 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-mono uppercase font-semibold">Ingresos Cobrados</span>
-            <span className="p-2 rounded-xl bg-blue-50 text-blue-600"><DollarSign size={16} /></span>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono mb-1">
-            ${totalIncomeUSD.toFixed(2)}
-          </div>
-          <div className="text-xs text-blue-700 font-mono font-semibold">
-            ~Bs. {(totalIncomeUSD * exchangeRate).toFixed(2)}
-          </div>
-        </div>
+      {/* Selector de Pestañas de Administración */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-blue-200/80 pb-3">
+        <button
+          onClick={() => setAdminTab('metrics')}
+          className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-1.5 ${
+            adminTab === 'metrics'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-white text-slate-700 hover:bg-blue-50 border border-slate-200'
+          }`}
+        >
+          <TrendingUp size={16} />
+          <span>Finanzas & Tickets</span>
+        </button>
 
-        {/* Por Cobrar al Retirar */}
-        <div className="rounded-3xl bg-white p-6 border border-amber-200 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-mono uppercase font-semibold">Por Cobrar (Al Retirar)</span>
-            <span className="p-2 rounded-xl bg-amber-50 text-amber-600"><Clock size={16} /></span>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-amber-700 font-mono mb-1">
-            ${pendingIncomeUSD.toFixed(2)}
-          </div>
-          <div className="text-xs text-amber-800 font-mono font-semibold">
-            ~Bs. {(pendingIncomeUSD * exchangeRate).toFixed(2)}
-          </div>
-        </div>
+        <button
+          onClick={() => setAdminTab('audit')}
+          className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-1.5 ${
+            adminTab === 'audit'
+              ? 'bg-amber-600 text-white shadow-sm'
+              : 'bg-white text-slate-700 hover:bg-amber-50 border border-slate-200'
+          }`}
+        >
+          <ShieldAlert size={16} />
+          <span>🛡️ Bitácora de Auditoría ({auditLogs.length})</span>
+        </button>
 
-        {/* Total Gastos Operativos */}
-        <div className="rounded-3xl bg-white p-6 border border-red-200 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-mono uppercase font-semibold">Gastos Operativos</span>
-            <span className="p-2 rounded-xl bg-red-50 text-red-600"><TrendingDown size={16} /></span>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-red-700 font-mono mb-1">
-            ${totalExpensesUSD.toFixed(2)}
-          </div>
-          <button
-            onClick={() => setShowExpenseModal(true)}
-            className="text-[11px] text-red-600 font-bold underline mt-1 block hover:text-red-700"
-          >
-            + Registrar Gasto
-          </button>
-        </div>
+        <button
+          onClick={() => setAdminTab('closures')}
+          className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-1.5 ${
+            adminTab === 'closures'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-white text-slate-700 hover:bg-blue-50 border border-slate-200'
+          }`}
+        >
+          <DollarSign size={16} />
+          <span>📊 Cierres Diarios Cuadrados ({dailyClosures.length})</span>
+        </button>
 
-        {/* Ganancia Neta & Margen */}
-        <div className="rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-50 p-6 border border-emerald-300 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-emerald-800 mb-2">
-            <span className="text-xs font-mono uppercase font-bold">Ganancia Neta Real</span>
-            <span className="p-2 rounded-xl bg-emerald-100 text-emerald-700"><Percent size={16} /></span>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-800 font-mono mb-1">
-            ${netProfitUSD.toFixed(2)}
-          </div>
-          <div className="text-xs text-emerald-700 font-bold font-mono">
-            Margen de Ganancia: {profitMargin.toFixed(1)}%
-          </div>
-        </div>
+        <button
+          onClick={() => setAdminTab('supplies')}
+          className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-1.5 ${
+            adminTab === 'supplies'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-white text-slate-700 hover:bg-blue-50 border border-slate-200'
+          }`}
+        >
+          <Layers size={16} />
+          <span>🧴 Insumos & Detergentes ({detergentLogs.length})</span>
+        </button>
       </div>
 
-      {/* Desglose de Métodos de Pago */}
-      <div className="rounded-3xl bg-white p-6 border border-blue-200/80 shadow-sm">
-        <h3 className="text-xs font-mono text-slate-500 uppercase tracking-wider font-bold mb-4">
-          Distribución de Caja por Método de Pago:
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-            <span className="text-xs text-slate-500 block mb-1 font-medium">Pago Móvil</span>
-            <span className="text-lg font-black text-slate-900 font-mono">${pagoMovilTotal.toFixed(2)}</span>
+      {/* CONTENIDO SEGÚN PESTAÑA ACTIVA */}
+      {adminTab === 'metrics' && (
+        <>
+          {/* Financial Key Metrics (4 Cards) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* Total Ingresos Cobrados */}
+            <div className="rounded-3xl bg-white p-6 border border-blue-200/80 shadow-sm relative overflow-hidden">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-mono uppercase font-semibold">Ingresos Cobrados</span>
+                <span className="p-2 rounded-xl bg-blue-50 text-blue-600"><DollarSign size={16} /></span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono mb-1">
+                ${totalIncomeUSD.toFixed(2)}
+              </div>
+              <div className="text-xs text-blue-700 font-mono font-semibold">
+                ~Bs. {(totalIncomeUSD * exchangeRate).toFixed(2)}
+              </div>
+            </div>
+
+            {/* Ganancia Neta Estimada */}
+            <div className="rounded-3xl bg-white p-6 border border-blue-200/80 shadow-sm relative overflow-hidden">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-mono uppercase font-semibold">Ganancia Neta</span>
+                <span className={`p-2 rounded-xl ${netProfitUSD >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                  <TrendingUp size={16} />
+                </span>
+              </div>
+              <div className={`text-2xl sm:text-3xl font-black font-mono mb-1 ${netProfitUSD >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                ${netProfitUSD.toFixed(2)}
+              </div>
+              <div className="text-xs text-slate-500 font-medium">
+                Margen operativo: <strong className="text-slate-800">{profitMargin.toFixed(1)}%</strong>
+              </div>
+            </div>
+
+            {/* Gastos Operativos */}
+            <div className="rounded-3xl bg-white p-6 border border-blue-200/80 shadow-sm relative overflow-hidden">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-mono uppercase font-semibold">Gastos Registrados</span>
+                <button 
+                  onClick={() => setShowExpenseModal(true)}
+                  className="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                  title="Añadir gasto"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono mb-1">
+                ${totalExpensesUSD.toFixed(2)}
+              </div>
+              <div className="text-xs text-slate-500">
+                {filteredExpenses.length} deducciones registradas
+              </div>
+            </div>
+
+            {/* Por Cobrar (Pendiente en Almacén) */}
+            <div className="rounded-3xl bg-white p-6 border border-blue-200/80 shadow-sm relative overflow-hidden">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-mono uppercase font-semibold">Por Cobrar al Retirar</span>
+                <span className="p-2 rounded-xl bg-amber-50 text-amber-600"><Clock size={16} /></span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-amber-900 font-mono mb-1">
+                ${pendingIncomeUSD.toFixed(2)}
+              </div>
+              <div className="text-xs text-amber-700 font-medium">
+                Ropa terminada pendiente de cobro
+              </div>
+            </div>
           </div>
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-            <span className="text-xs text-slate-500 block mb-1 font-medium">Divisas ($ Efectivo)</span>
-            <span className="text-lg font-black text-slate-900 font-mono">${usdCashTotal.toFixed(2)}</span>
+
+          {/* Payment Methods Breakdown & Expenses Summary */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Payment Method Breakdown */}
+            <div className="lg:col-span-2 rounded-3xl bg-white p-6 sm:p-8 border border-blue-200/80 shadow-sm">
+              <h3 className="text-base font-black text-slate-900 mb-6 flex items-center justify-between">
+                <span>Distribución de Ingresos por Método de Pago</span>
+                <span className="text-xs font-mono text-slate-500 font-semibold">{filteredOrders.filter(o => o.paymentStatus === 'paid').length} cobros</span>
+              </h3>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200">
+                  <span className="text-xs font-bold text-blue-900 block mb-1">📱 Pago Móvil</span>
+                  <div className="text-lg font-black text-slate-900 font-mono">${pagoMovilTotal.toFixed(2)}</div>
+                  <div className="text-[10px] text-blue-700 font-mono">~Bs. {(pagoMovilTotal * exchangeRate).toFixed(2)}</div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200">
+                  <span className="text-xs font-bold text-emerald-900 block mb-1">💵 Efectivo USD</span>
+                  <div className="text-lg font-black text-slate-900 font-mono">${usdCashTotal.toFixed(2)}</div>
+                  <div className="text-[10px] text-emerald-700 font-semibold">En billetes caja</div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200">
+                  <span className="text-xs font-bold text-indigo-900 block mb-1">🇻🇪 Efectivo Bs</span>
+                  <div className="text-lg font-black text-slate-900 font-mono">${bsCashTotal.toFixed(2)}</div>
+                  <div className="text-[10px] text-indigo-700 font-mono">~Bs. {(bsCashTotal * exchangeRate).toFixed(2)}</div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-200">
+                  <span className="text-xs font-bold text-purple-900 block mb-1">🏦 Transferencia</span>
+                  <div className="text-lg font-black text-slate-900 font-mono">${transferTotal.toFixed(2)}</div>
+                  <div className="text-[10px] text-purple-700 font-mono">Banesco/Mercantil</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Expenses Summary Box */}
+            <div className="rounded-3xl bg-white p-6 border border-blue-200/80 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-black text-slate-900">Gastos Recientes</h3>
+                  <button 
+                    onClick={() => setShowExpenseModal(true)}
+                    className="text-xs text-red-600 font-bold hover:underline"
+                  >
+                    + Agregar
+                  </button>
+                </div>
+                <div className="space-y-2.5">
+                  {filteredExpenses.slice(0, 3).map((e) => (
+                    <div key={e.id} className="flex items-center justify-between text-xs p-2 rounded-xl bg-slate-50">
+                      <div>
+                        <div className="font-bold text-slate-800">{e.description}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{e.date}</div>
+                      </div>
+                      <span className="font-mono font-bold text-red-600">-${e.amountUSD.toFixed(2)}</span>
+                    </div>
+                  ))}
+                  {filteredExpenses.length === 0 && (
+                    <p className="text-xs text-slate-400 py-4 text-center">No hay gastos en este periodo</p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-            <span className="text-xs text-slate-500 block mb-1 font-medium">Efectivo en Bs</span>
-            <span className="text-lg font-black text-slate-900 font-mono">${bsCashTotal.toFixed(2)}</span>
+
+          {/* Orders / Tickets List */}
+          <div className="rounded-3xl bg-white p-6 sm:p-8 border border-blue-200/80 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Tickets de Servicio y Ropa en Proceso</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Control de clientes, cestas recibidas y entregas</p>
+              </div>
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs flex items-center gap-1.5 transition-colors"
+              >
+                <Plus size={14} /> Nuevo Ticket
+              </button>
+            </div>
+
+            {filteredOrders.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                <AlertCircle size={36} className="mx-auto mb-2 text-slate-300" />
+                <p className="text-sm font-semibold">No hay tickets registrados en este periodo</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 font-mono uppercase text-[11px] border-b border-slate-100">
+                    <tr>
+                      <th className="py-3 px-4">Ticket</th>
+                      <th className="py-3 px-4">Cliente / Contacto</th>
+                      <th className="py-3 px-4">Servicio</th>
+                      <th className="py-3 px-4 text-right">Total ($ USD)</th>
+                      <th className="py-3 px-4 text-center">Pago</th>
+                      <th className="py-3 px-4 text-center">Estado Ropa</th>
+                      <th className="py-3 px-4 text-center">WhatsApp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredOrders.map((order) => (
+                      <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-blue-600">
+                          #{order.id}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900">{order.customerName}</div>
+                          <div className="text-[11px] text-slate-400 font-mono">{order.customerPhone}</div>
+                        </td>
+                        <td className="py-3 px-4 text-slate-700 font-medium">
+                          {order.itemsSummary}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-black text-slate-900">
+                          ${order.totalUSD.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            order.paymentStatus === 'paid' 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {order.paymentStatus === 'paid' ? 'Pagado' : 'Por Cobrar'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">
+                            {order.orderStatus}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            onClick={() => notifyCustomerReady(order)}
+                            title="Notificar por WhatsApp que la ropa está lista"
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] inline-flex items-center gap-1.5 transition-colors shadow-xs"
+                          >
+                            <MessageSquare size={13} />
+                            Avisar Listo
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-            <span className="text-xs text-slate-500 block mb-1 font-medium">Transferencias</span>
-            <span className="text-lg font-black text-slate-900 font-mono">${transferTotal.toFixed(2)}</span>
+        </>
+      )}
+
+      {/* PESTAÑA: BITÁCORA DE AUDITORÍA Y TRAZABILIDAD (BORRADOS) */}
+      {adminTab === 'audit' && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-3xl bg-amber-50/70 border border-amber-300 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-600 text-white flex items-center justify-center font-black shadow-sm">
+                <ShieldAlert size={24} />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 text-base sm:text-lg">
+                  Bitácora de Auditoría y Trazabilidad de Borrados
+                </h3>
+                <p className="text-xs text-slate-600">
+                  Control estricto de seguridad: Cualquier dato eliminado por la empleada requiere tu contraseña y queda registrado aquí con fecha, monto y el motivo exacto.
+                </p>
+              </div>
+            </div>
+            <span className="text-xs font-black text-amber-900 bg-white px-3.5 py-1.5 rounded-xl border border-amber-300">
+              {auditLogs.length} Evento(s) Registrado(s)
+            </span>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <h4 className="font-black text-slate-900 text-sm">Historial Inmutable de Acciones</h4>
+              <span className="text-[11px] text-slate-500 font-medium">Solo visible para el Administrador</span>
+            </div>
+
+            <div className="divide-y divide-slate-100">
+              {auditLogs.map((log) => (
+                <div key={log.id} className="p-5 hover:bg-slate-50/60 transition-colors space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                        log.action === 'ELIMINACIÓN_REGISTRO'
+                          ? 'bg-red-100 text-red-800 border border-red-200'
+                          : 'bg-blue-100 text-blue-800 border border-blue-200'
+                      }`}>
+                        {log.action}
+                      </span>
+                      <span className="text-xs font-extrabold text-slate-900">
+                        {log.performedBy}
+                      </span>
+                    </div>
+                    <span className="font-mono text-xs text-slate-500 font-medium">
+                      🕒 {log.timestamp}
+                    </span>
+                  </div>
+
+                  {/* MOTIVO OBLIGATORIO DESTACADO */}
+                  <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200 flex items-start gap-2.5">
+                    <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-[11px] font-black text-amber-900 uppercase tracking-wide">
+                        Motivo ingresado para autorizar el borrado:
+                      </span>
+                      <p className="text-xs font-bold text-slate-900 mt-0.5">
+                        "{log.reason}"
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* SNAPSHOT DEL REGISTRO BORRADO */}
+                  {log.recordSnapshot && (
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Cliente afectado:</span>
+                        <strong className="text-slate-900">{log.recordSnapshot.cliente}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Monto borrado:</span>
+                        <strong className="text-red-700 font-mono">${log.recordSnapshot.montoUSD?.toFixed(2)} USD</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Fecha/Hora original:</span>
+                        <span className="font-mono">{log.recordSnapshot.fecha} ({log.recordSnapshot.hora})</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Servicios / REF:</span>
+                        <span>{log.recordSnapshot.servicios} · {log.recordSnapshot.referencia}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Orders Management Table */}
-      <div className="rounded-3xl bg-white p-6 sm:p-8 border border-blue-200/80 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-black text-slate-900">Tickets y Órdenes Recientes</h3>
-            <p className="text-xs text-slate-500">Control de estado de lavado, cobros y avisos por WhatsApp</p>
+      {/* PESTAÑA: CIERRES DIARIOS CUADRADOS */}
+      {adminTab === 'closures' && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-3xl bg-blue-50/70 border border-blue-200 shadow-sm flex items-center justify-between">
+            <div>
+              <h3 className="font-black text-slate-900 text-base sm:text-lg">
+                Historial de Cierres Diarios de Caja
+              </h3>
+              <p className="text-xs text-slate-600">
+                Arqueos de caja entregados por la encargada al final de cada turno.
+              </p>
+            </div>
+            <span className="text-xs font-bold text-blue-900 bg-white px-3 py-1.5 rounded-xl border border-blue-200">
+              {dailyClosures.length} Cierres
+            </span>
           </div>
-          <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-mono font-bold">
-            {filteredOrders.length} Órdenes
-          </span>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {dailyClosures.map((closure) => (
+              <div key={closure.id} className="p-6 rounded-3xl bg-white border border-blue-200/80 shadow-md space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <span className="text-xs font-mono text-slate-500 font-medium">Cierre del {closure.date}</span>
+                    <h4 className="text-xl font-black text-slate-900 font-mono">${closure.cobradoUSD.toFixed(2)} USD</h4>
+                    <span className="text-xs text-blue-700 font-mono font-semibold">≈ Bs. {closure.cobradoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800">
+                    Cerrado por: {closure.closedBy}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-100">
+                    <span className="text-[10px] text-purple-700 font-bold block">Pago Móvil / Transf:</span>
+                    <strong className="text-purple-950 font-mono">Bs. {closure.pagoMovilBs.toLocaleString('es-VE')}</strong>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
+                    <span className="text-[10px] text-emerald-700 font-bold block">Divisas en Efectivo:</span>
+                    <strong className="text-emerald-950 font-mono">${closure.divisasEfectivoUSD.toFixed(2)} USD</strong>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-100">
+                    <span className="text-[10px] text-amber-700 font-bold block">Efectivo en Bs:</span>
+                    <strong className="text-amber-950 font-mono">Bs. {closure.efectivoBs.toLocaleString('es-VE')}</strong>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] text-slate-600 font-bold block">Dinero Entregado:</span>
+                    <strong className="text-slate-900 font-mono">Bs. {closure.dineroEntregadoBs} / ${closure.dineroEntregadoUSD}</strong>
+                  </div>
+                </div>
+
+                {closure.notes && (
+                  <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 italic">
+                    "{closure.notes}"
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
+      )}
 
-        {filteredOrders.length === 0 ? (
-          <div className="text-center py-12 text-slate-400 text-sm">
-            No hay tickets registrados en este período.
+      {/* PESTAÑA: CONSUMO DE INSUMOS Y DETERGENTES */}
+      {adminTab === 'supplies' && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-3xl bg-white border border-blue-200 shadow-sm flex items-center justify-between">
+            <div>
+              <h3 className="font-black text-slate-900 text-base sm:text-lg">
+                Consumo y Apertura de Detergentes
+              </h3>
+              <p className="text-xs text-slate-600">
+                Registro de envases de jabón, suavizante, cloro y desengrasante iniciados en el taller.
+              </p>
+            </div>
+            <span className="text-xs font-bold text-blue-900 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200">
+              {detergentLogs.length} Aperturas
+            </span>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-200 text-slate-500 font-mono uppercase text-[11px] bg-slate-50/50">
-                <tr>
-                  <th className="py-3 px-3">Ticket</th>
-                  <th className="py-3 px-3">Cliente</th>
-                  <th className="py-3 px-3">Servicio</th>
-                  <th className="py-3 px-3">Monto</th>
-                  <th className="py-3 px-3">Pago</th>
-                  <th className="py-3 px-3">Estado Ropa</th>
-                  <th className="py-3 px-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-blue-50/50 transition-colors">
-                    <td className="py-4 px-3 font-mono font-black text-blue-700">{order.id}</td>
-                    <td className="py-4 px-3">
-                      <div className="font-black text-slate-900">{order.customerName}</div>
-                      <div className="text-[11px] text-slate-500 font-mono">{order.customerPhone}</div>
-                    </td>
-                    <td className="py-4 px-3 max-w-[200px] truncate text-slate-600 font-medium">{order.itemsSummary}</td>
-                    <td className="py-4 px-3 font-mono font-black text-slate-900">
-                      ${order.totalUSD.toFixed(2)}
-                      <span className="block text-[10px] text-slate-500 font-normal">Bs. {order.totalBs.toFixed(0)}</span>
-                    </td>
-                    <td className="py-4 px-3">
-                      {order.paymentStatus === 'paid' ? (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          ✅ Pagado
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => updatePaymentStatus(order.id, 'paid')}
-                          className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 hover:bg-emerald-600 hover:text-white transition-colors"
-                        >
-                          ⏳ Marcar Pagado
-                        </button>
-                      )}
-                    </td>
-                    <td className="py-4 px-3">
-                      <select
-                        value={order.orderStatus}
-                        onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                        className="bg-white border border-slate-200 rounded-lg p-1.5 text-[11px] text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
-                      >
-                        <option value="received">📥 Recibido</option>
-                        <option value="washing">🧼 En Lavado</option>
-                        <option value="drying">💨 En Secado</option>
-                        <option value="ready">✨ Listo</option>
-                        <option value="delivered">📦 Entregado</option>
-                      </select>
-                    </td>
-                    <td className="py-4 px-3 text-right">
-                      <button
-                        onClick={() => notifyCustomerReady(order)}
-                        title="Notificar por WhatsApp que la ropa está lista"
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] inline-flex items-center gap-1.5 transition-colors shadow-xs"
-                      >
-                        <MessageSquare size={13} />
-                        Avisar Listo
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden">
+            <div className="divide-y divide-slate-100">
+              {detergentLogs.map((item) => (
+                <div key={item.id} className="p-4 flex items-center justify-between text-xs hover:bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">
+                      {item.item === 'Jabón' ? '🧴' : item.item === 'Suavizante' ? '🌸' : item.item === 'Cloro' ? '🧪' : '🧽'}
+                    </span>
+                    <div>
+                      <h5 className="font-extrabold text-slate-900 text-sm">{item.item} iniciado</h5>
+                      <p className="text-slate-500 text-[11px]">{item.notes} · Registrado por: {item.employee}</p>
+                    </div>
+                  </div>
+                  <div className="text-right font-mono text-slate-600">
+                    <p className="font-bold">{item.date}</p>
+                    <p className="text-[10px]">{item.time}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Modal Registrar Gasto */}
       {showExpenseModal && (

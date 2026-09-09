@@ -7,9 +7,11 @@ import PromoInfo from './components/client/PromoInfo';
 import AccountingDashboard from './components/admin/AccountingDashboard';
 import MachineMaintenance from './components/admin/MachineMaintenance';
 import CustomerCRM from './components/admin/CustomerCRM';
+import EmployeeWorkStation from './components/employee/EmployeeWorkStation';
 import { 
   Sparkles, Layers, Calculator, Settings, Users, 
-  Wrench, DollarSign, Shield, Phone, Globe, ShieldAlert 
+  Wrench, DollarSign, Shield, Phone, Globe, ShieldAlert,
+  BookOpen
 } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
@@ -118,6 +120,17 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => setCurrentView('employee')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  currentView === 'employee'
+                    ? 'bg-blue-600 text-white shadow-sm font-extrabold'
+                    : 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70'
+                }`}
+              >
+                <BookOpen size={14} /> 📝 Cuaderno Empleada
+              </button>
+
+              <button
                 onClick={() => handleAdminAccess('admin_accounting')}
                 className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                   currentView.startsWith('admin')
@@ -180,6 +193,7 @@ export default function App() {
               </>
             )}
 
+            {currentView === 'employee' && <EmployeeWorkStation />}
             {currentView === 'admin_accounting' && <AccountingDashboard />}
             {currentView === 'admin_machines' && <MachineMaintenance />}
             {currentView === 'admin_crm' && <CustomerCRM />}
