@@ -40,6 +40,15 @@ export default function EmployeeWorkStation() {
   const [intakeBankRef, setIntakeBankRef] = useState('');
   const [intakeNotes, setIntakeNotes] = useState('');
 
+  // Estado para la Barra Directa de Carga en Mostrador
+  const [inlineClientName, setInlineClientName] = useState('');
+  const [inlineClientPhone, setInlineClientPhone] = useState('');
+  const [inlineAmountUSD, setInlineAmountUSD] = useState('7.50');
+  const [inlinePayMethod, setInlinePayMethod] = useState('usd_cash'); // 'usd_cash' | 'pago_movil' | 'bs_cash' | 'pending'
+  const [inlineBankRef, setInlineBankRef] = useState('');
+  const [inlineNotes, setInlineNotes] = useState('');
+  const [inlineSuccessToast, setInlineSuccessToast] = useState('');
+
   // Estado del Formulario de Carga Rápida (Mostrador)
   const [showAddModal, setShowAddModal] = useState(false);
   const [time, setTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -57,9 +66,9 @@ export default function EmployeeWorkStation() {
 
   // Pagos
   const [paymentStatus, setPaymentStatus] = useState('paid'); // 'paid' | 'partial' | 'pending'
-  const [paymentMethod, setPaymentMethod] = useState('pago_movil');
+  const [paymentMethod, setPaymentMethod] = useState('usd_cash');
   const [bankReference, setBankReference] = useState('');
-  const [manualTotalUSD, setManualTotalUSD] = useState('');
+  const [manualTotalUSD, setManualTotalUSD] = useState('7.50');
   const [manualAmountPaidUSD, setManualAmountPaidUSD] = useState('');
   const [notes, setNotes] = useState('');
   const [markedNewDetergent, setMarkedNewDetergent] = useState(false);
@@ -163,6 +172,9 @@ export default function EmployeeWorkStation() {
       addDetergentLog(newDetergentType, `Apertura registrada en orden de ${customerName.trim()}`, 'Encargada');
     }
 
+    setInlineSuccessToast(`✅ ¡Cliente "${customerName.trim()}" registrado con éxito por $${effectiveTotalUSD.toFixed(2)} USD!`);
+    setTimeout(() => setInlineSuccessToast(''), 4000);
+
     // Limpiar formulario
     setShowAddModal(false);
     setCustomerName('');
@@ -174,12 +186,62 @@ export default function EmployeeWorkStation() {
     setSoftenerCount(1);
     setBleachCount(0);
     setDegreaserCount(0);
-    setManualTotalUSD('');
+    setManualTotalUSD('7.50');
     setManualAmountPaidUSD('');
     setBankReference('');
     setNotes('');
     setPaymentStatus('paid');
     setMarkedNewDetergent(false);
+    setOriginFilter('all');
+  };
+
+  // Manejador para carga directa e instantánea en barra de mostrador
+  const handleInlineQuickAdd = (e) => {
+    e.preventDefault();
+    if (!inlineClientName.trim()) {
+      alert('Por favor indica el nombre del cliente');
+      return;
+    }
+
+    const numUSD = parseFloat(inlineAmountUSD) || 0;
+    const isPending = inlinePayMethod === 'pending';
+
+    addDailyRecord({
+      date: selectedDate,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      customerName: inlineClientName.trim(),
+      customerPhone: inlineClientPhone.trim(),
+      washCount: 1,
+      dryCount: 1,
+      soapCount: 1,
+      laborCount: 1,
+      softenerCount: 1,
+      bleachCount: 0,
+      degreaserCount: 0,
+      totalUSD: numUSD,
+      totalBs: numUSD * (exchangeRate || 40.50),
+      amountPaidUSD: isPending ? 0 : numUSD,
+      amountPaidBs: isPending ? 0 : numUSD * (exchangeRate || 40.50),
+      debtUSD: isPending ? numUSD : 0,
+      paymentStatus: isPending ? 'pending' : 'paid',
+      paymentMethod: isPending ? 'usd_cash' : inlinePayMethod,
+      bankReference: inlineBankRef.trim() || (inlinePayMethod === 'usd_cash' ? 'Efectivo $' : inlinePayMethod === 'bs_cash' ? 'Efectivo Bs' : isPending ? 'Debe al retirar' : 'Comprobante mostrador'),
+      deliveryStatus: 'in_store',
+      origin: 'walk_in',
+      intakeStatus: 'confirmed',
+      notes: inlineNotes.trim() || (isPending ? 'Ropa dejada / Paga al retirar' : 'Cargado directamente en mostrador')
+    });
+
+    setInlineSuccessToast(`✅ ¡Cliente "${inlineClientName.trim()}" registrado en el cuaderno por $${numUSD.toFixed(2)} USD!`);
+    setTimeout(() => setInlineSuccessToast(''), 4000);
+
+    setInlineClientName('');
+    setInlineClientPhone('');
+    setInlineAmountUSD('7.50');
+    setInlineBankRef('');
+    setInlineNotes('');
+    setInlinePayMethod('usd_cash');
+    setOriginFilter('all');
   };
 
   // Botones de presets rápidos para mostrador
@@ -538,6 +600,212 @@ export default function EmployeeWorkStation() {
       {/* PESTAÑA 1: CUADERNO DIARIO (REGISTRO POR FILAS) */}
       {activeTab === 'daily_log' && (
         <div className="space-y-4">
+
+          {/* Toast de confirmación al cargar cliente */}
+          {inlineSuccessToast && (
+            <div className="p-3.5 rounded-2xl bg-emerald-600 text-white font-extrabold text-xs shadow-md flex items-center gap-2 animate-in fade-in duration-150">
+              <CheckCircle2 size={18} />
+              <span>{inlineSuccessToast}</span>
+            </div>
+          )}
+
+          {/* BARRA DIRECTA DE CARGA EN MOSTRADOR */}
+          <div className="bg-white p-5 rounded-3xl border border-blue-200 shadow-md">
+            <div className="flex items-center justify-between gap-3 mb-3 border-b border-blue-50 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black text-sm">
+                  ⚡
+                </span>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 leading-none">
+                    Carga Directa en Mostrador
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Ingresa los datos del cliente, monto y forma de pago al instante
+                  </p>
+                </div>
+              </div>
+
+              {/* Botón para abrir el formulario con desglose completo */}
+              <button
+                type="button"
+                onClick={() => {
+                  setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                  setShowAddModal(true);
+                }}
+                className="text-[11px] text-blue-600 hover:text-blue-800 font-extrabold flex items-center gap-1 hover:underline"
+              >
+                <span>+ Abrir Formulario Detallado</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleInlineQuickAdd} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {/* 1. Nombre del Cliente */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Cliente *:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={inlineClientName}
+                    onChange={(e) => setInlineClientName(e.target.value)}
+                    placeholder="Ej: Albert, Jenny..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                {/* 2. Teléfono */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Teléfono (Opcional):
+                  </label>
+                  <input
+                    type="tel"
+                    value={inlineClientPhone}
+                    onChange={(e) => setInlineClientPhone(e.target.value)}
+                    placeholder="Ej: 0412..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                {/* 3. Monto Designado */}
+                <div>
+                  <label className="block text-[11px] font-bold text-blue-900 mb-1">
+                    Monto Designado ($ USD) *:
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={inlineAmountUSD}
+                    onChange={(e) => setInlineAmountUSD(e.target.value)}
+                    placeholder="7.50"
+                    className="w-full px-3 py-2 rounded-xl border border-blue-300 text-xs font-mono font-black text-blue-950 bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-[10px] text-blue-700 font-semibold block mt-0.5">
+                    ≈ Bs. {((parseFloat(inlineAmountUSD) || 0) * (exchangeRate || 40.50)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                {/* 4. Forma de Pago */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Forma de Pago:
+                  </label>
+                  <select
+                    value={inlinePayMethod}
+                    onChange={(e) => setInlinePayMethod(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none"
+                  >
+                    <option value="usd_cash">💵 Efectivo USD ($)</option>
+                    <option value="pago_movil">📱 Pago Móvil</option>
+                    <option value="bs_cash">🇻🇪 Efectivo Bs</option>
+                    <option value="pending">⏳ Ropa Dejada (Paga al retirar)</option>
+                  </select>
+                </div>
+
+                {/* 5. Referencia y Botón Guardar */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Referencia / RF:
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={inlineBankRef}
+                      onChange={(e) => setInlineBankRef(e.target.value)}
+                      placeholder="Ej: RF 1234"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono text-slate-900 bg-slate-50 focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase shadow-md flex items-center gap-1.5 shrink-0 transition-transform active:scale-95"
+                    >
+                      <Plus size={16} />
+                      <span>Cargar</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Atajos Rápidos de Monto en Mostrador */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">Montos Rápidos:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInlineAmountUSD('7.50');
+                    setInlineNotes('1 Cesta Combo ($7.50)');
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-extrabold border border-blue-200"
+                >
+                  🧺 1 Cesta ($7.50)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInlineAmountUSD('15.00');
+                    setInlineNotes('2 Cestas Combo ($15.00)');
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-extrabold border border-blue-200"
+                >
+                  🧺🧺 2 Cestas ($15.00)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInlineAmountUSD('4.50');
+                    setInlineNotes('Solo Lavado + Jabón ($4.50)');
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-extrabold border border-blue-200"
+                >
+                  🫧 Lavado + Jabón ($4.50)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInlineAmountUSD('10.00');
+                    setInlineNotes('Edredón Individual ($10.00)');
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[11px] font-extrabold border border-indigo-200"
+                >
+                  🛏️ Edredón Ind ($10)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInlineAmountUSD('12.00');
+                    setInlineNotes('Edredón Matrimonial ($12.00)');
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[11px] font-extrabold border border-indigo-200"
+                >
+                  🛏️ Edredón Mat ($12)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInlineAmountUSD('14.00');
+                    setInlineNotes('Edredón Grande ($14.00)');
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[11px] font-extrabold border border-indigo-200"
+                >
+                  🛏️ Edredón Grande ($14)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInlineAmountUSD('32.00');
+                    setInlineNotes('Forros de Autobús ($32.00)');
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-800 text-[11px] font-extrabold border border-cyan-200"
+                >
+                  🚌 Forros Bus ($32)
+                </button>
+              </div>
+            </form>
+          </div>
           
           {/* Barra de Filtros de Fecha, Origen y Búsqueda */}
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-blue-100 shadow-xs">
@@ -1076,7 +1344,7 @@ export default function EmployeeWorkStation() {
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
                   />
                 </div>
-                <div className="sm:col-span-2">
+                <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Nombre del Cliente *:</label>
                   <input
                     type="text"
@@ -1086,6 +1354,16 @@ export default function EmployeeWorkStation() {
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Ej: Albert, Jenny, Enrique..."
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Teléfono (Opcional):</label>
+                  <input
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    placeholder="Ej: 0412-1234567"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
@@ -1189,28 +1467,33 @@ export default function EmployeeWorkStation() {
               {/* Montos y Totales */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-blue-50/70 p-3.5 rounded-2xl border border-blue-200">
                 <div>
-                  <label className="block text-xs font-bold text-blue-900 mb-1">Monto Total USD (Calculado: ${calculatedUSD.toFixed(2)}):</label>
+                  <label className="block text-xs font-bold text-blue-900 mb-1">
+                    Monto Designado a Cobrar ($ USD) *:
+                  </label>
                   <input
                     type="number"
                     step="any"
+                    required
                     value={manualTotalUSD}
                     onChange={(e) => setManualTotalUSD(e.target.value)}
-                    placeholder={`Por defecto: ${calculatedUSD.toFixed(2)}`}
-                    className="w-full px-3 py-2 rounded-xl border border-blue-200 text-xs font-mono font-bold text-slate-900 bg-white focus:outline-none"
+                    placeholder="7.50"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-blue-300 text-sm font-mono font-black text-blue-950 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="text-[10px] text-blue-700">≈ Bs. {effectiveTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-[11px] font-bold text-blue-700 mt-1 block">
+                    ≈ Bs. {effectiveTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-blue-900 mb-1">Estado del Pago:</label>
+                  <label className="block text-xs font-bold text-blue-900 mb-1">Forma / Estado de Pago:</label>
                   <select
                     value={paymentStatus}
                     onChange={(e) => setPaymentStatus(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-blue-200 text-xs font-bold text-slate-900 bg-white focus:outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-blue-300 text-xs font-bold text-slate-900 bg-white focus:outline-none"
                   >
-                    <option value="paid">✓ Pagado Completo</option>
+                    <option value="paid">✓ Cancela Ahora Completo</option>
+                    <option value="pending">⏳ Ropa Dejada (Paga al retirar)</option>
                     <option value="partial">⏳ Abono Parcial</option>
-                    <option value="pending">❌ Debe Completo (Paga al retirar)</option>
                   </select>
                 </div>
               </div>
