@@ -1,289 +1,390 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Sparkles, Calculator, Check, Plus, Minus, Info, ArrowRight, ShoppingBag } from 'lucide-react';
+import { 
+  Calculator, Plus, Minus, Sparkles, 
+  MessageCircle, ArrowRight, RefreshCw
+} from 'lucide-react';
 
 export default function BasketCalculator() {
   const { prices, exchangeRate } = useApp();
 
-  // Estados del cotizador
-  const [basketCount, setBasketCount] = useState(1);
-  const [serviceType, setServiceType] = useState('comboFull'); // 'comboFull' | 'washWithSoap' | 'custom'
-  
-  // Opciones personalizadas
-  const [includeWash, setIncludeWash] = useState(true);
-  const [includeDry, setIncludeDry] = useState(false);
-  const [includeSoap, setIncludeSoap] = useState(true);
-  const [includeSoftener, setIncludeSoftener] = useState(false);
-  const [includeBleach, setIncludeBleach] = useState(false);
-  const [includeLabor, setIncludeLabor] = useState(true);
+  // Cantidad de prendas del cliente
+  const [pants, setPants] = useState(0);         // ~5 pantalones = 1 cesta
+  const [shirts, setShirts] = useState(0);       // ~12 franelas = 1 cesta
+  const [towels, setTowels] = useState(0);       // ~3.5 toallas = 1 cesta
+  const [mixedClothes, setMixedClothes] = useState(0); // ~16 prendas ligeras/ropa variada = 1 cesta
 
-  // Estimador de prendas
-  const [activeTab, setActiveTab] = useState('baskets'); // 'baskets' | 'estimator'
-  const [pantsMen, setPantsMen] = useState(0);
-  const [pantsWomen, setPantsWomen] = useState(0);
-  const [shirts, setShirts] = useState(0);
-  const [towels, setTowels] = useState(0);
-  const [bedsheets, setBedsheets] = useState(0);
+  // Edredones (se cobran por unidad y tamaño)
+  const [comforterSingle, setComforterSingle] = useState(0);     // $10
+  const [comforterDouble, setComforterDouble] = useState(0);     // $12
+  const [comforterLarge, setComforterLarge] = useState(0);       // $14
 
-  // Cálculo de unidades equivalentes
-  const calculatedBasketsFromClothes = Math.max(
-    1,
-    Math.ceil(
-      (pantsMen * 1.3 + pantsWomen * 1.1 + shirts * 0.45 + towels * 1.5 + bedsheets * 2.8) / 6.0
-    )
-  );
+  // Modo directo de cestas (si el cliente ya las tiene medidas)
+  const [directBaskets, setDirectBaskets] = useState(0);
+  const [useDirectBaskets, setUseDirectBaskets] = useState(false);
 
-  // Cálculo del precio unitario por cesta según tipo
-  let unitPriceUSD = 0;
-  if (serviceType === 'comboFull') {
-    unitPriceUSD = prices.comboFull; // 7.50$
-  } else if (serviceType === 'washWithSoap') {
-    unitPriceUSD = prices.washWithSoapCombo; // 4.50$
+  // Selección de servicios para la ropa ordinaria
+  // Presets: 'comboFull' ($7.50), 'washWithSoap' ($4.50), 'custom'
+  const [serviceMode, setServiceMode] = useState('comboFull');
+
+  // Opciones de servicios individuales
+  const [serviceWash, setServiceWash] = useState(true);          // $4.00
+  const [serviceDry, setServiceDry] = useState(true);            // $3.00
+  const [serviceSoap, setServiceSoap] = useState(true);          // $0.50
+  const [serviceSoftener, setServiceSoftener] = useState(true);  // $0.70
+  const [serviceBleach, setServiceBleach] = useState(false);     // $0.50
+  const [serviceLabor, setServiceLabor] = useState(true);        // $0.20
+
+  // Manejador de cambio de Preset
+  const handlePresetChange = (mode) => {
+    setServiceMode(mode);
+    if (mode === 'comboFull') {
+      setServiceWash(true);
+      setServiceDry(true);
+      setServiceSoap(true);
+      setServiceSoftener(true);
+      setServiceBleach(false);
+      setServiceLabor(true);
+    } else if (mode === 'washWithSoap') {
+      setServiceWash(true);
+      setServiceDry(false);
+      setServiceSoap(true);
+      setServiceSoftener(false);
+      setServiceBleach(false);
+      setServiceLabor(true);
+    }
+  };
+
+  // Cuando se conmuta un servicio manual, pasamos a modo personalizado
+  const toggleCustomService = (setter, currentValue) => {
+    setter(!currentValue);
+    setServiceMode('custom');
+  };
+
+  // Cálculo de Cestas Estimadas a partir de las prendas
+  const totalWeightApprox = 
+    (pants * 1.2) + 
+    (shirts * 0.5) + 
+    (towels * 1.7) + 
+    (mixedClothes * 0.375);
+
+  const totalClothesCount = pants + shirts + towels + mixedClothes;
+
+  const calculatedBaskets = totalClothesCount > 0 
+    ? Math.max(1, Math.ceil(totalWeightApprox / 6.0)) 
+    : 0;
+
+  const effectiveBaskets = useDirectBaskets 
+    ? directBaskets 
+    : (totalClothesCount > 0 ? calculatedBaskets : 1);
+
+  // Precio unitario por cesta según servicios seleccionados
+  let basketUnitPrice = 0;
+  if (serviceMode === 'comboFull') {
+    basketUnitPrice = prices.comboFull || 7.50;
+  } else if (serviceMode === 'washWithSoap') {
+    basketUnitPrice = prices.washWithSoapCombo || 4.50;
   } else {
-    // Personalizado
-    if (includeWash) unitPriceUSD += prices.washOnly; // 4.00
-    if (includeDry) unitPriceUSD += prices.dryOnly; // 3.00
-    if (includeSoap) unitPriceUSD += prices.soap; // 0.50
-    if (includeSoftener) unitPriceUSD += prices.softener; // 0.70
-    if (includeBleach) unitPriceUSD += prices.bleachDegreaser; // 0.50
-    if (includeLabor) unitPriceUSD += prices.labor; // 0.20
+    if (serviceWash) basketUnitPrice += (prices.washOnly || 4.00);
+    if (serviceDry) basketUnitPrice += (prices.dryOnly || 3.00);
+    if (serviceSoap) basketUnitPrice += (prices.soap || 0.50);
+    if (serviceSoftener) basketUnitPrice += (prices.softener || 0.70);
+    if (serviceBleach) basketUnitPrice += (prices.bleachDegreaser || 0.50);
+    if (serviceLabor) basketUnitPrice += (prices.labor || 0.20);
   }
 
-  const effectiveBaskets = activeTab === 'baskets' ? basketCount : calculatedBasketsFromClothes;
-  const totalUSD = effectiveBaskets * unitPriceUSD;
+  // Costo por cestas de ropa
+  const subtotalClothes = effectiveBaskets * basketUnitPrice;
+
+  // Costo por Edredones
+  const totalComfortersCount = comforterSingle + comforterDouble + comforterLarge;
+  const subtotalComforters = 
+    (comforterSingle * (prices.comforterSingle || 10.00)) +
+    (comforterDouble * (prices.comforterDouble || 12.00)) +
+    (comforterLarge * (prices.comforterMatrimonialLarge || 14.00));
+
+  // TOTAL ESTIMADO
+  const totalUSD = subtotalClothes + subtotalComforters;
   const totalBs = totalUSD * exchangeRate;
 
+  // Reset general
+  const handleReset = () => {
+    setPants(0);
+    setShirts(0);
+    setTowels(0);
+    setMixedClothes(0);
+    setComforterSingle(0);
+    setComforterDouble(0);
+    setComforterLarge(0);
+    setDirectBaskets(1);
+    setUseDirectBaskets(false);
+    handlePresetChange('comboFull');
+  };
+
+  // Generar mensaje detallado para WhatsApp
+  const generateWhatsAppMessage = () => {
+    const lines = [];
+    lines.push('🧺 *SOLICITUD DE COTIZACIÓN - LAVANDERÍA AJ*');
+    lines.push('');
+    
+    if (useDirectBaskets) {
+      lines.push(`• Cestas directas: *${directBaskets} cesta(s)*`);
+    } else if (totalClothesCount > 0) {
+      lines.push('👕 *Prendas ingresadas:*');
+      if (pants > 0) lines.push(`  - Pantalones: ${pants}`);
+      if (shirts > 0) lines.push(`  - Franelas/Camisas: ${shirts}`);
+      if (towels > 0) lines.push(`  - Toallas: ${towels}`);
+      if (mixedClothes > 0) lines.push(`  - Ropa Variada: ${mixedClothes}`);
+      lines.push(`  ↳ Cestas estimadas: *${effectiveBaskets} cesta(s)* (~${(effectiveBaskets * 6).toFixed(0)} kg)`);
+    } else {
+      lines.push(`• Cestas: *${effectiveBaskets} cesta(s)*`);
+    }
+
+    lines.push('');
+    lines.push('⚙️ *Servicios para la ropa:*');
+    if (serviceMode === 'comboFull') {
+      lines.push('  - ⭐ COMBO ESTRELLA ($7.50/cesta): Lavado + Secado + Jabón + Suavizante + Mano de Obra');
+    } else if (serviceMode === 'washWithSoap') {
+      lines.push('  - 💧 Lavado + Jabón + Mano de Obra ($4.50/cesta)');
+    } else {
+      const activeSvcs = [];
+      if (serviceWash) activeSvcs.push('Lavado ($4)');
+      if (serviceDry) activeSvcs.push('Secado ($3)');
+      if (serviceSoap) activeSvcs.push('Jabón ($0.50)');
+      if (serviceSoftener) activeSvcs.push('Suavizante ($0.70)');
+      if (serviceBleach) activeSvcs.push('Cloro/Desengrasante ($0.50)');
+      if (serviceLabor) activeSvcs.push('Mano de obra ($0.20)');
+      lines.push(`  - Personalizado: ${activeSvcs.join(', ')} ($${basketUnitPrice.toFixed(2)}/cesta)`);
+    }
+
+    if (totalComfortersCount > 0) {
+      lines.push('');
+      lines.push('🛏️ *Edredones:*');
+      if (comforterSingle > 0) lines.push(`  - Individual: ${comforterSingle} ($${(comforterSingle * 10).toFixed(2)})`);
+      if (comforterDouble > 0) lines.push(`  - Doble/Matrimonial: ${comforterDouble} ($${(comforterDouble * 12).toFixed(2)})`);
+      if (comforterLarge > 0) lines.push(`  - Matrimonial Grande: ${comforterLarge} ($${(comforterLarge * 14).toFixed(2)})`);
+    }
+
+    lines.push('');
+    lines.push(`💰 *TOTAL ESTIMADO:* *$${totalUSD.toFixed(2)} USD* (~Bs. ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`);
+    lines.push('');
+    lines.push('¿Tienen disponibilidad para recibir mis prendas hoy? ¡Muchas gracias!');
+
+    return encodeURIComponent(lines.join('\n'));
+  };
+
   return (
-    <div className="rounded-3xl glass-panel p-6 sm:p-8 mb-8 border border-cyan-500/20 shadow-xl">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+    <div className="rounded-3xl bg-white border border-blue-200/80 shadow-lg shadow-blue-900/5 p-6 sm:p-8 mb-8">
+      
+      {/* Header del Simulador */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-blue-100">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold uppercase tracking-wider mb-2 border border-cyan-500/30">
-            <Calculator size={14} /> Cotizador Interactivo por Cestas
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider mb-2 border border-blue-200">
+            <Calculator size={14} className="text-blue-600" />
+            Simulador Inteligente de Prendas y Servicios
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-            Calcula el Total de tu Lavada
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Calcula tu Lavada según tus Prendas
           </h2>
-          <p className="text-xs sm:text-sm text-gray-400 mt-1">
-            1 Cesta equivale a <strong>5 a 7 kg de ropa seca</strong>.
+          <p className="text-sm text-slate-600 mt-1">
+            Ingresa la cantidad de ropa, selecciona los servicios deseados y obtén tu precio estimado al instante.
           </p>
         </div>
 
-        {/* Tab switch */}
-        <div className="p-1 rounded-xl bg-slate-900/80 border border-white/10 flex">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setActiveTab('baskets')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === 'baskets' ? 'bg-cyan-500 text-black shadow-md' : 'text-gray-400 hover:text-white'
+            onClick={() => setUseDirectBaskets(!useDirectBaskets)}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+              useDirectBaskets 
+                ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                : 'bg-blue-50/80 text-blue-900 border-blue-200 hover:bg-blue-100'
             }`}
           >
-            Por Cestas Directas
+            {useDirectBaskets ? '🧺 Modo: Cestas Directas' : '👕 Modo: Por Prendas'}
           </button>
           <button
-            onClick={() => setActiveTab('estimator')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === 'estimator' ? 'bg-cyan-500 text-black shadow-md' : 'text-gray-400 hover:text-white'
-            }`}
+            onClick={handleReset}
+            title="Reiniciar simulador"
+            className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 border border-slate-200 transition-colors"
           >
-            Por Cantidad de Prendas
+            <RefreshCw size={16} />
           </button>
         </div>
       </div>
 
-      {/* Mode 1: Baskets direct */}
-      {activeTab === 'baskets' ? (
-        <div className="mb-8 p-6 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col sm:flex-row items-center justify-between gap-6">
+      {/* SECCIÓN 1: INGRESO DE PRENDAS O CESTAS */}
+      <div className="py-6 border-b border-blue-100">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+            {useDirectBaskets ? 'Indica tus Cestas de Ropa:' : 'Ingresa la Cantidad de tus Prendas:'}
+          </h3>
+          <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
+            1 Cesta = 5 a 7 kg de ropa seca
+          </span>
+        </div>
+
+        {useDirectBaskets ? (
+          <div className="p-6 rounded-2xl bg-blue-50/50 border border-blue-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <p className="font-bold text-slate-900 text-sm">¿Cuántas cestas completas vas a lavar?</p>
+              <p className="text-xs text-slate-500">Capacidad estándar de 5 a 7 kilos en seco por cesta.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setDirectBaskets(Math.max(1, directBaskets - 1))}
+                className="w-11 h-11 rounded-xl bg-white border border-blue-200 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold shadow-sm"
+              >
+                <Minus size={18} />
+              </button>
+              <span className="w-14 text-center text-3xl font-black text-blue-900 font-mono">
+                {directBaskets}
+              </span>
+              <button
+                onClick={() => setDirectBaskets(directBaskets + 1)}
+                className="w-11 h-11 rounded-xl bg-white border border-blue-200 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold shadow-sm"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+          </div>
+        ) : (
           <div>
-            <h3 className="text-base font-bold text-white mb-1">¿Cuántas cestas de ropa tienes?</h3>
-            <p className="text-xs text-gray-400">Cada cesta es una lavada estándar de 5 a 7 kg.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-2xl p-4 bg-slate-50/70 border border-slate-200 hover:border-blue-300 transition-all">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">👖</span>
+                  <span className="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">~5 por cesta</span>
+                </div>
+                <h4 className="font-extrabold text-slate-900 text-sm">Pantalones</h4>
+                <div className="flex items-center justify-between gap-2 bg-white rounded-xl p-1.5 border border-slate-200 mt-2">
+                  <button onClick={() => setPants(Math.max(0, pants - 1))} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold"><Minus size={14} /></button>
+                  <input type="number" min="0" value={pants} onChange={(e) => setPants(Math.max(0, parseInt(e.target.value) || 0))} className="w-12 text-center font-black text-base text-slate-900 focus:outline-none" />
+                  <button onClick={() => setPants(pants + 1)} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold"><Plus size={14} /></button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl p-4 bg-slate-50/70 border border-slate-200 hover:border-blue-300 transition-all">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">👕</span>
+                  <span className="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">~12 por cesta</span>
+                </div>
+                <h4 className="font-extrabold text-slate-900 text-sm">Franelas / Camisas</h4>
+                <div className="flex items-center justify-between gap-2 bg-white rounded-xl p-1.5 border border-slate-200 mt-2">
+                  <button onClick={() => setShirts(Math.max(0, shirts - 1))} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold"><Minus size={14} /></button>
+                  <input type="number" min="0" value={shirts} onChange={(e) => setShirts(Math.max(0, parseInt(e.target.value) || 0))} className="w-12 text-center font-black text-base text-slate-900 focus:outline-none" />
+                  <button onClick={() => setShirts(shirts + 1)} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold"><Plus size={14} /></button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl p-4 bg-slate-50/70 border border-slate-200 hover:border-blue-300 transition-all">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">🧖</span>
+                  <span className="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">~3 a 4 por cesta</span>
+                </div>
+                <h4 className="font-extrabold text-slate-900 text-sm">Toallas de Baño</h4>
+                <div className="flex items-center justify-between gap-2 bg-white rounded-xl p-1.5 border border-slate-200 mt-2">
+                  <button onClick={() => setTowels(Math.max(0, towels - 1))} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold"><Minus size={14} /></button>
+                  <input type="number" min="0" value={towels} onChange={(e) => setTowels(Math.max(0, parseInt(e.target.value) || 0))} className="w-12 text-center font-black text-base text-slate-900 focus:outline-none" />
+                  <button onClick={() => setTowels(towels + 1)} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold"><Plus size={14} /></button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl p-4 bg-slate-50/70 border border-slate-200 hover:border-blue-300 transition-all">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">🧺</span>
+                  <span className="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">~16 por cesta</span>
+                </div>
+                <h4 className="font-extrabold text-slate-900 text-sm">Ropa Variada</h4>
+                <div className="flex items-center justify-between gap-2 bg-white rounded-xl p-1.5 border border-slate-200 mt-2">
+                  <button onClick={() => setMixedClothes(Math.max(0, mixedClothes - 1))} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold"><Minus size={14} /></button>
+                  <input type="number" min="0" value={mixedClothes} onChange={(e) => setMixedClothes(Math.max(0, parseInt(e.target.value) || 0))} className="w-12 text-center font-black text-base text-slate-900 focus:outline-none" />
+                  <button onClick={() => setMixedClothes(mixedClothes + 1)} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold"><Plus size={14} /></button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 p-4 rounded-2xl bg-sky-50/60 border border-sky-200">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🛏️</span>
+                  <h4 className="font-extrabold text-slate-900 text-sm">Edredones</h4>
+                </div>
+                <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">❌ No King Size</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { label: 'Individual', val: comforterSingle, setter: setComforterSingle, price: '$10.00' },
+                  { label: 'Doble/Matrim', val: comforterDouble, setter: setComforterDouble, price: '$12.00' },
+                  { label: 'Mat. Grande', val: comforterLarge, setter: setComforterLarge, price: '$14.00' }
+                ].map((item, i) => (
+                  <div key={i} className="bg-white rounded-xl p-3 border border-sky-200/80 flex items-center justify-between">
+                    <div><p className="font-bold text-xs text-slate-900">{item.label}</p><p className="text-[10px] font-extrabold text-blue-600">{item.price}</p></div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => item.setter(Math.max(0, item.val - 1))} className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold"><Minus size={12} /></button>
+                      <span className="w-6 text-center font-bold text-sm text-slate-900">{item.val}</span>
+                      <button onClick={() => item.setter(item.val + 1)} className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold"><Plus size={12} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-lg shadow-sm">{effectiveBaskets}</div>
+                <div>
+                  <h5 className="font-black text-slate-900 text-sm">{effectiveBaskets === 1 ? '1 Cesta' : `${effectiveBaskets} Cestas`}</h5>
+                  <p className="text-xs text-slate-600">Total: {totalClothesCount} prendas estimadas.</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setBasketCount(Math.max(1, basketCount - 1))}
-              className="w-12 h-12 rounded-2xl bg-slate-800 border border-white/10 text-white font-bold text-lg flex items-center justify-center hover:bg-cyan-500 hover:text-black transition-colors"
-            >
-              <Minus size={18} />
+        )}
+      </div>
+
+      <div className="py-6 border-b border-blue-100">
+        <h3 className="text-base font-extrabold text-slate-900 mb-4">Selecciona servicios para tus prendas:</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+          {[
+            { id: 'comboFull', title: 'COMBO ESTRELLA VIP', price: '$7.50', desc: 'Lavado + Secado + Jabón + Suavizante + Mano de Obra' },
+            { id: 'washWithSoap', title: 'LAVADO + JABÓN', price: '$4.50', desc: 'Lavado + Jabón + Mano de Obra (Sin secado)' },
+            { id: 'custom', title: 'A MEDIDA', price: `$${basketUnitPrice.toFixed(2)}`, desc: 'Personaliza los servicios' }
+          ].map((mode) => (
+            <div key={mode.id} onClick={() => handlePresetChange(mode.id)} className={`cursor-pointer rounded-2xl p-4 border transition-all ${serviceMode === mode.id ? 'bg-blue-50 border-blue-600 ring-2 ring-blue-600/20' : 'bg-white border-slate-200'}`}>
+              <h4 className="font-black text-slate-900 text-sm">{mode.title}</h4>
+              <p className="text-[10px] text-slate-600 mt-1 mb-2">{mode.desc}</p>
+              <span className="text-lg font-black text-blue-700">{mode.price}</span>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+          {[
+            { id: 'wash', label: 'Lavado', price: prices.washOnly, setter: setServiceWash, val: serviceWash, icon: '🫧' },
+            { id: 'dry', label: 'Secado', price: prices.dryOnly, setter: setServiceDry, val: serviceDry, icon: '💨' },
+            { id: 'soap', label: 'Jabón', price: prices.soap, setter: setServiceSoap, val: serviceSoap, icon: '🧴' },
+            { id: 'soft', label: 'Suaviz.', price: prices.softener, setter: setServiceSoftener, val: serviceSoftener, icon: '🌸' },
+            { id: 'bleach', label: 'Cloro', price: prices.bleachDegreaser, setter: setServiceBleach, val: serviceBleach, icon: '🧪' },
+            { id: 'labor', label: 'Mano O.', price: prices.labor, setter: setServiceLabor, val: serviceLabor, icon: '👔' }
+          ].map((svc) => (
+            <button key={svc.id} onClick={() => toggleCustomService(svc.setter, svc.val)} className={`p-3 rounded-xl border transition-all ${svc.val ? 'bg-blue-50 border-blue-500' : 'bg-white border-slate-200'}`}>
+              <span className="text-lg">{svc.icon}</span>
+              <p className="text-[10px] font-bold text-slate-700">{svc.label}</p>
             </button>
-            <span className="text-3xl font-extrabold text-cyan-400 font-mono w-12 text-center">
-              {basketCount}
-            </span>
-            <button
-              onClick={() => setBasketCount(basketCount + 1)}
-              className="w-12 h-12 rounded-2xl bg-slate-800 border border-white/10 text-white font-bold text-lg flex items-center justify-center hover:bg-cyan-500 hover:text-black transition-colors"
-            >
-              <Plus size={18} />
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* Mode 2: Estimator by items */
-        <div className="mb-8 p-6 rounded-2xl bg-white/[0.02] border border-white/5">
-          <h3 className="text-sm font-bold text-white mb-3">Indica cuántas prendas tienes aproximadamente:</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-white/5">
-              <label className="text-[11px] text-gray-400 block mb-1">Pantalones Hombre</label>
-              <input
-                type="number"
-                min="0"
-                value={pantsMen || ''}
-                placeholder="0"
-                onChange={(e) => setPantsMen(parseInt(e.target.value) || 0)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-white font-bold text-center text-sm focus:outline-none focus:border-cyan-400"
-              />
-            </div>
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-white/5">
-              <label className="text-[11px] text-gray-400 block mb-1">Pantalones Mujer</label>
-              <input
-                type="number"
-                min="0"
-                value={pantsWomen || ''}
-                placeholder="0"
-                onChange={(e) => setPantsWomen(parseInt(e.target.value) || 0)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-white font-bold text-center text-sm focus:outline-none focus:border-cyan-400"
-              />
-            </div>
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-white/5">
-              <label className="text-[11px] text-gray-400 block mb-1">Franelas / Camisas</label>
-              <input
-                type="number"
-                min="0"
-                value={shirts || ''}
-                placeholder="0"
-                onChange={(e) => setShirts(parseInt(e.target.value) || 0)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-white font-bold text-center text-sm focus:outline-none focus:border-cyan-400"
-              />
-            </div>
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-white/5">
-              <label className="text-[11px] text-gray-400 block mb-1">Toallas de Baño</label>
-              <input
-                type="number"
-                min="0"
-                value={towels || ''}
-                placeholder="0"
-                onChange={(e) => setTowels(parseInt(e.target.value) || 0)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-white font-bold text-center text-sm focus:outline-none focus:border-cyan-400"
-              />
-            </div>
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-white/5">
-              <label className="text-[11px] text-gray-400 block mb-1">Juegos de Sábanas</label>
-              <input
-                type="number"
-                min="0"
-                value={bedsheets || ''}
-                placeholder="0"
-                onChange={(e) => setBedsheets(parseInt(e.target.value) || 0)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-white font-bold text-center text-sm focus:outline-none focus:border-cyan-400"
-              />
-            </div>
-          </div>
-          <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-between text-xs text-cyan-300">
-            <span>💡 Estimación automática:</span>
-            <span className="font-extrabold text-sm">{calculatedBasketsFromClothes} Cesta(s) (~{calculatedBasketsFromClothes * 6} kg en seco)</span>
-          </div>
-        </div>
-      )}
-
-      {/* Service Type Selector */}
-      <h3 className="text-sm font-bold text-white mb-3 uppercase font-mono tracking-wider">
-        Selecciona tu Paquete de Servicio:
-      </h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        {/* Option 1: Combo Estrella */}
-        <div
-          onClick={() => setServiceType('comboFull')}
-          className={`cursor-pointer rounded-2xl p-5 border transition-all relative ${
-            serviceType === 'comboFull'
-              ? 'border-cyan-400 bg-cyan-950/40 shadow-[0_0_25px_rgba(6,182,212,0.25)]'
-              : 'border-white/10 bg-slate-900/40 hover:border-white/20'
-          }`}
-        >
-          <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-cyan-400 text-black text-[10px] font-extrabold uppercase">
-            Más Popular
-          </div>
-          <h4 className="text-base font-extrabold text-white mb-1">⭐ Servicio Completo VIP</h4>
-          <p className="text-xs text-gray-400 mb-3">Lavado + Secado + Jabón + Suavizante + Mano de Obra</p>
-          <div className="text-2xl font-black text-cyan-400 font-mono">${prices.comboFull.toFixed(2)} <span className="text-xs text-gray-400 font-normal">/ cesta</span></div>
-        </div>
-
-        {/* Option 2: Solo Lavado + Jabón */}
-        <div
-          onClick={() => setServiceType('washWithSoap')}
-          className={`cursor-pointer rounded-2xl p-5 border transition-all ${
-            serviceType === 'washWithSoap'
-              ? 'border-cyan-400 bg-cyan-950/40 shadow-[0_0_25px_rgba(6,182,212,0.25)]'
-              : 'border-white/10 bg-slate-900/40 hover:border-white/20'
-          }`}
-        >
-          <h4 className="text-base font-extrabold text-white mb-1">Lavado + Jabón</h4>
-          <p className="text-xs text-gray-400 mb-3">Lavado con jabón incluido + Mano de Obra (Sin secado)</p>
-          <div className="text-2xl font-black text-white font-mono">${prices.washWithSoapCombo.toFixed(2)} <span className="text-xs text-gray-400 font-normal">/ cesta</span></div>
-        </div>
-
-        {/* Option 3: Personalizado */}
-        <div
-          onClick={() => setServiceType('custom')}
-          className={`cursor-pointer rounded-2xl p-5 border transition-all ${
-            serviceType === 'custom'
-              ? 'border-cyan-400 bg-cyan-950/40 shadow-[0_0_25px_rgba(6,182,212,0.25)]'
-              : 'border-white/10 bg-slate-900/40 hover:border-white/20'
-          }`}
-        >
-          <h4 className="text-base font-extrabold text-white mb-1">Arma a tu Gusto</h4>
-          <p className="text-xs text-gray-400 mb-3">Elige exactamente qué insumos y procesos deseas</p>
-          <div className="text-2xl font-black text-white font-mono">${unitPriceUSD.toFixed(2)} <span className="text-xs text-gray-400 font-normal">/ cesta</span></div>
+          ))}
         </div>
       </div>
 
-      {/* Custom options checklist (Only visible if 'custom') */}
-      {serviceType === 'custom' && (
-        <div className="p-5 rounded-2xl bg-black/40 border border-white/10 mb-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
-            <input type="checkbox" checked={includeWash} onChange={(e) => setIncludeWash(e.target.checked)} className="rounded text-cyan-500" />
-            Lavado (${prices.washOnly.toFixed(2)})
-          </label>
-          <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
-            <input type="checkbox" checked={includeDry} onChange={(e) => setIncludeDry(e.target.checked)} className="rounded text-cyan-500" />
-            Secado (${prices.dryOnly.toFixed(2)})
-          </label>
-          <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
-            <input type="checkbox" checked={includeSoap} onChange={(e) => setIncludeSoap(e.target.checked)} className="rounded text-cyan-500" />
-            Jabón Líquido (${prices.soap.toFixed(2)})
-          </label>
-          <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
-            <input type="checkbox" checked={includeSoftener} onChange={(e) => setIncludeSoftener(e.target.checked)} className="rounded text-cyan-500" />
-            Suavizante (${prices.softener.toFixed(2)})
-          </label>
-          <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
-            <input type="checkbox" checked={includeBleach} onChange={(e) => setIncludeBleach(e.target.checked)} className="rounded text-cyan-500" />
-            Cloro/Desengrasante (${prices.bleachDegreaser.toFixed(2)})
-          </label>
-          <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
-            <input type="checkbox" checked={includeLabor} onChange={(e) => setIncludeLabor(e.target.checked)} className="rounded text-cyan-500" />
-            Mano de Obra (${prices.labor.toFixed(2)})
-          </label>
-        </div>
-      )}
-
-      {/* Summary Box */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-cyan-950/60 to-blue-950/60 border border-cyan-500/30 flex flex-col sm:flex-row items-center justify-between gap-6">
-        <div>
-          <div className="text-xs uppercase font-mono text-cyan-400 mb-1">Presupuesto Estimado:</div>
-          <div className="flex items-baseline gap-3">
-            <span className="text-3xl sm:text-4xl font-black text-white font-mono">${totalUSD.toFixed(2)} USD</span>
-            <span className="text-sm text-gray-300 font-mono">(Aprox. Bs. {totalBs.toFixed(2)})</span>
+      <div className="pt-6">
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-900 via-blue-950 to-slate-900 text-white shadow-xl flex flex-col lg:flex-row items-center justify-between gap-6">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-cyan-400 text-xs font-extrabold uppercase tracking-wider"><Sparkles size={16} /> Resumen</div>
+            <p className="text-sm text-slate-200">Total: ${totalUSD.toFixed(2)} USD (≈ Bs. {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</p>
           </div>
-          <div className="text-xs text-gray-400 mt-1">
-            {effectiveBaskets} Cesta(s) de ropa · {serviceType === 'comboFull' ? 'Servicio Completo ($7.50)' : serviceType === 'washWithSoap' ? 'Lavado + Jabón ($4.50)' : 'Personalizado'}
-          </div>
+          <a href={`https://wa.me/584126701633?text=${generateWhatsAppMessage()}`} target="_blank" rel="noopener noreferrer" className="px-6 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-extrabold text-sm uppercase flex items-center gap-2 shadow-lg">
+            <MessageCircle size={18} /> Enviar a WhatsApp <ArrowRight size={16} />
+          </a>
         </div>
-
-        <a
-          href={`https://wa.me/584126701633?text=Hola%20Lavanderia%20AJ,%20quiero%20solicitar%20un%20servicio%20para%20${effectiveBaskets}%20cesta(s)%20de%20ropa%20(Total%20estimado:%20$${totalUSD.toFixed(2)}).`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full sm:w-auto px-6 py-4 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-sm uppercase tracking-wider text-center flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)]"
-        >
-          Pedir por WhatsApp <ArrowRight size={16} />
-        </a>
       </div>
     </div>
   );

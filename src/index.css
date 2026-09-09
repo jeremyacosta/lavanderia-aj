@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
-  background-color: #080E1E;
-  color: #F1F5F9;
+  background-color: #EEF5FB;
+  color: #0F172A;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   margin: 0;
   padding: 0;
@@ -18,27 +18,27 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0B132B;
+  background: #E2EEF8;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1C2541;
+  background: #94A3B8;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #06B6D4;
+  background: #0284C7;
 }
 
-/* Glassmorphism helpers */
+/* Panel and Card helpers for Light Sky/Blueish Theme */
 .glass-panel {
-  background: rgba(16, 26, 54, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(186, 215, 242, 0.6);
+  box-shadow: 0 10px 30px -10px rgba(30, 64, 175, 0.08), 0 4px 6px -2px rgba(30, 64, 175, 0.03);
 }
 
 .glass-card {
-  background: rgba(13, 21, 45, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(6, 182, 212, 0.15);
+  background: #FFFFFF;
+  border: 1px solid rgba(219, 234, 254, 0.9);
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.05);
 }

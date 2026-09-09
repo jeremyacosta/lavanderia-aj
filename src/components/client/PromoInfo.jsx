@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Phone, Clock, CreditCard, Star, Tag, Info, MessageCircle, ChevronDown, ChevronUp, Sparkles, Zap } from "lucide-react";
 
 const WA_NUMBER = "584126701633";
@@ -69,13 +69,13 @@ const FAQ = [
 function FaqItem({ item }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border border-white/10 rounded-xl overflow-hidden" onClick={() => setOpen(!open)}>
-      <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/5 transition-colors">
-        <span className="text-sm font-semibold text-white pr-4">{item.q}</span>
-        {open ? <ChevronUp size={16} className="text-cyan-400 shrink-0" /> : <ChevronDown size={16} className="text-gray-400 shrink-0" />}
+    <div className="border border-blue-100 rounded-xl overflow-hidden bg-white shadow-xs" onClick={() => setOpen(!open)}>
+      <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-blue-50/50 transition-colors">
+        <span className="text-sm font-bold text-slate-800 pr-4">{item.q}</span>
+        {open ? <ChevronUp size={16} className="text-blue-600 shrink-0" /> : <ChevronDown size={16} className="text-slate-400 shrink-0" />}
       </div>
       {open && (
-        <div className="px-4 pb-4 text-sm text-gray-400 leading-relaxed border-t border-white/5 pt-3">{item.a}</div>
+        <div className="px-4 pb-4 text-sm text-slate-600 leading-relaxed border-t border-blue-50 pt-3">{item.a}</div>
       )}
     </div>
   );
@@ -87,37 +87,39 @@ export default function PromoInfo() {
       {/* PROMOCIONES */}
       <div>
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-xl bg-yellow-400/20 flex items-center justify-center">
-            <Tag size={18} className="text-yellow-400" />
+          <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+            <Tag size={18} className="text-amber-600" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-white tracking-tight">Precios y Promociones</h2>
-            <p className="text-xs text-gray-400">Precios fijos · Sin sorpresas</p>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">Precios y Promociones</h2>
+            <p className="text-xs text-slate-500">Tarifas claras sin cargos ocultos</p>
           </div>
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           {PROMOTIONS.map((promo) => (
             <div
               key={promo.id}
-              className={`relative rounded-2xl border bg-gradient-to-br p-5 ${promo.badgeColor} ${promo.highlight ? "ring-2 ring-yellow-400/30" : ""}`}
+              className={`relative rounded-2xl border bg-white p-5 shadow-sm hover:shadow-md transition-all ${
+                promo.highlight ? 'border-amber-400 ring-2 ring-amber-400/20' : 'border-blue-100'
+              }`}
             >
               {promo.highlight && (
                 <div className="absolute -top-3 left-4">
-                  <span className="px-3 py-1 rounded-full bg-yellow-400 text-black text-[10px] font-black tracking-widest uppercase shadow-lg">
+                  <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black tracking-widest uppercase shadow-xs">
                     ⭐ El más pedido
                   </span>
                 </div>
               )}
-              <div className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border mb-3 ${promo.badgeColor}`}>
+              <div className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-blue-200 bg-blue-50 text-blue-800 mb-3">
                 {promo.badge}
               </div>
-              <h3 className="text-base font-extrabold text-white leading-tight">{promo.title}</h3>
-              <p className="text-xs text-gray-300 mt-1 mb-3 leading-relaxed">{promo.subtitle}</p>
+              <h3 className="text-base font-black text-slate-900 leading-tight">{promo.title}</h3>
+              <p className="text-xs text-slate-600 mt-1 mb-3 leading-relaxed">{promo.subtitle}</p>
               <div className="flex items-end gap-2">
-                <span className="text-3xl font-black text-white">{promo.price}</span>
-                <span className="text-xs text-gray-400 mb-1">{promo.per}</span>
+                <span className="text-3xl font-black text-blue-700 font-mono">{promo.price}</span>
+                <span className="text-xs text-slate-500 mb-1">{promo.per}</span>
               </div>
-              <p className="text-xs text-gray-400 mt-2 leading-relaxed">{promo.detail}</p>
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">{promo.detail}</p>
             </div>
           ))}
         </div>
@@ -126,20 +128,20 @@ export default function PromoInfo() {
       {/* MÉTODOS DE PAGO */}
       <div>
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-xl bg-green-400/20 flex items-center justify-center">
-            <CreditCard size={18} className="text-green-400" />
+          <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+            <CreditCard size={18} className="text-emerald-600" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-white tracking-tight">Métodos de Pago</h2>
-            <p className="text-xs text-gray-400">Sin Zelle · Sin Binance · Solo Venezuela</p>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">Métodos de Pago Aceptados</h2>
+            <p className="text-xs text-slate-500">Sin Zelle · Sin Binance · Operaciones en Venezuela</p>
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {PAYMENT_METHODS.map((pm) => (
-            <div key={pm.name} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center hover:border-green-400/30 transition-colors">
+            <div key={pm.name} className="rounded-2xl border border-blue-100 bg-white p-4 text-center shadow-xs hover:border-blue-300 transition-colors">
               <div className="text-3xl mb-2">{pm.icon}</div>
-              <p className="text-xs font-bold text-white">{pm.name}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">{pm.desc}</p>
+              <p className="text-xs font-black text-slate-900">{pm.name}</p>
+              <p className="text-[10px] text-slate-500 mt-0.5 font-medium">{pm.desc}</p>
             </div>
           ))}
         </div>
@@ -147,43 +149,43 @@ export default function PromoInfo() {
 
       {/* HORARIO & CONTACTO */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
-            <Clock size={16} className="text-cyan-400" />
-            <h3 className="font-extrabold text-white">Horario de Atención</h3>
+            <Clock size={16} className="text-blue-600" />
+            <h3 className="font-black text-slate-900">Horario de Atención</h3>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-300">📅 Lun – Sáb</span>
-              <span className="text-sm font-bold text-white bg-cyan-500/20 rounded-lg px-2.5 py-0.5 border border-cyan-500/30">7:30 AM – 6:00 PM</span>
+              <span className="text-sm text-slate-700 font-medium">📅 Lun – Sáb</span>
+              <span className="text-sm font-bold text-blue-900 bg-blue-50 rounded-lg px-2.5 py-0.5 border border-blue-200">7:30 AM – 6:00 PM</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-300">🌤️ Domingos</span>
-              <span className="text-sm font-bold text-white bg-blue-500/20 rounded-lg px-2.5 py-0.5 border border-blue-500/30">9:00 AM – 4:00 PM</span>
+              <span className="text-sm text-slate-700 font-medium">🌤️ Domingos</span>
+              <span className="text-sm font-bold text-blue-900 bg-blue-50 rounded-lg px-2.5 py-0.5 border border-blue-200">9:00 AM – 4:00 PM</span>
             </div>
           </div>
-          <div className="mt-4 p-3 rounded-xl bg-yellow-400/10 border border-yellow-400/20">
-            <p className="text-[11px] text-yellow-300 leading-relaxed">
+          <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200">
+            <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
               💡 <strong>Tip:</strong> Para edredones y forros de bus, tráelos temprano para que queden listos el mismo día.
             </p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex flex-col justify-between">
+        <div className="rounded-2xl border border-blue-100 bg-white p-5 flex flex-col justify-between shadow-sm">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <Phone size={16} className="text-green-400" />
-              <h3 className="font-extrabold text-white">Contáctanos</h3>
+              <Phone size={16} className="text-emerald-600" />
+              <h3 className="font-black text-slate-900">Contáctanos</h3>
             </div>
-            <p className="text-sm text-gray-300 mb-1">Número de atención</p>
-            <p className="text-2xl font-black text-white tracking-wider">0412-670-1633</p>
-            <p className="text-xs text-gray-400 mt-1">LAVANDERÍA AJ · Caracas, Venezuela</p>
+            <p className="text-xs text-slate-500 mb-1">Línea directa de atención</p>
+            <p className="text-2xl font-black text-slate-900 tracking-wider font-mono">0412-670-1633</p>
+            <p className="text-xs text-slate-500 mt-1">LAVANDERÍA AJ · Caracas, Venezuela</p>
           </div>
           <a
             href={`${WA_URL}?text=${encodeURIComponent("Hola! Me comunico desde la app de Lavandería AJ. Quisiera información sobre sus servicios.")}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-green-500 hover:bg-green-400 active:scale-95 transition-all text-white font-extrabold text-sm shadow-md"
+            className="mt-4 flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition-all text-white font-extrabold text-sm shadow-sm"
           >
             <MessageCircle size={16} />
             Escribir por WhatsApp
@@ -194,12 +196,12 @@ export default function PromoInfo() {
       {/* FAQ */}
       <div>
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-xl bg-blue-400/20 flex items-center justify-center">
-            <Info size={18} className="text-blue-400" />
+          <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+            <Info size={18} className="text-blue-600" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-white tracking-tight">Preguntas Frecuentes</h2>
-            <p className="text-xs text-gray-400">Todo lo que necesitas saber</p>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">Preguntas Frecuentes</h2>
+            <p className="text-xs text-slate-500">Respuestas rápidas a tus dudas</p>
           </div>
         </div>
         <div className="space-y-2">
@@ -208,13 +210,13 @@ export default function PromoInfo() {
       </div>
 
       {/* SERVICIOS EXCLUIDOS */}
-      <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
-        <p className="text-sm font-bold text-red-300 mb-2 flex items-center gap-2">
-          <Zap size={14} /> Servicios que NO ofrecemos:
+      <div className="rounded-2xl border border-red-200 bg-red-50/70 p-5">
+        <p className="text-sm font-bold text-red-800 mb-2 flex items-center gap-2">
+          <Zap size={14} className="text-red-600" /> Servicios que <strong>NO</strong> ofrecemos:
         </p>
         <div className="flex flex-wrap gap-2">
           {["❌ Calzado", "❌ Planchado", "❌ Desmanchado", "❌ King Size", "❌ Domicilio"].map(s => (
-            <span key={s} className="px-3 py-1 rounded-full bg-red-900/40 border border-red-500/30 text-xs text-red-300 font-semibold">{s}</span>
+            <span key={s} className="px-3 py-1 rounded-full bg-white border border-red-200 text-xs text-red-700 font-semibold shadow-2xs">{s}</span>
           ))}
         </div>
       </div>

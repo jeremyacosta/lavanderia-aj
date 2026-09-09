@@ -80,56 +80,56 @@ export default function OrderTicketModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-lg rounded-3xl glass-panel border border-cyan-500/30 p-6 sm:p-8 bg-[#091024] shadow-2xl my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+      <div className="relative w-full max-w-lg rounded-3xl bg-white border border-blue-200 p-6 sm:p-8 shadow-2xl my-8">
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 text-gray-400 hover:text-white p-2 rounded-xl bg-white/5"
+          className="absolute top-5 right-5 text-slate-400 hover:text-slate-800 p-2 rounded-xl bg-slate-100"
         >
           <X size={18} />
         </button>
 
         <div className="flex items-center gap-2 mb-4">
-          <span className="p-2 rounded-xl bg-cyan-500/20 text-cyan-400">
+          <span className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
             <Plus size={20} />
           </span>
-          <h2 className="text-xl font-bold text-white">Nuevo Ticket de Recepción</h2>
+          <h2 className="text-xl font-black text-slate-900">Nuevo Ticket de Recepción</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Cliente */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-mono text-gray-400 block mb-1">Nombre del Cliente *</label>
+              <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Nombre del Cliente *</label>
               <input
                 type="text"
                 required
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Ej. Juan Pérez"
-                className="w-full bg-slate-900/90 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-cyan-400"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="text-xs font-mono text-gray-400 block mb-1">Teléfono WhatsApp *</label>
+              <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Teléfono WhatsApp *</label>
               <input
                 type="tel"
                 required
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="Ej. 04141234567"
-                className="w-full bg-slate-900/90 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-cyan-400"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-blue-500 font-mono"
               />
             </div>
           </div>
 
           {/* Servicio */}
           <div>
-            <label className="text-xs font-mono text-gray-400 block mb-1">Tipo de Servicio</label>
+            <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Tipo de Servicio</label>
             <select
               value={servicePackage}
               onChange={(e) => setServicePackage(e.target.value)}
-              className="w-full bg-slate-900/90 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-cyan-400"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
             >
               <option value="comboFull">Combo Completo VIP ($7.50 / Cesta)</option>
               <option value="washWithSoap">Solo Lavado + Jabón ($4.50 / Cesta)</option>
@@ -145,7 +145,7 @@ export default function OrderTicketModal({ isOpen, onClose }) {
           {/* Cantidad de Cestas si aplica */}
           {['comboFull', 'washWithSoap', 'washOnly', 'dryOnly'].includes(servicePackage) && (
             <div>
-              <label className="text-xs font-mono text-gray-400 block mb-1">Cantidad de Cestas</label>
+              <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Cantidad de Cestas</label>
               <div className="flex items-center gap-3">
                 {[1, 2, 3, 4, 5].map((num) => (
                   <button
@@ -153,7 +153,7 @@ export default function OrderTicketModal({ isOpen, onClose }) {
                     type="button"
                     onClick={() => setBaskets(num)}
                     className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
-                      baskets === num ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-slate-900 border-white/10 text-gray-300'
+                      baskets === num ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-slate-100 border-slate-200 text-slate-700'
                     }`}
                   >
                     {num} {num === 1 ? 'Cesta' : 'Cestas'}
@@ -166,14 +166,14 @@ export default function OrderTicketModal({ isOpen, onClose }) {
           {/* Precio forros si aplica */}
           {servicePackage === 'busCovers' && (
             <div>
-              <label className="text-xs font-mono text-gray-400 block mb-1">Monto Acordado en Dólares ($)</label>
+              <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Monto Acordado en Dólares ($)</label>
               <input
                 type="number"
                 step="1"
                 value={customPriceUSD}
                 onChange={(e) => setCustomPriceUSD(e.target.value)}
                 placeholder="Ej. 30.00"
-                className="w-full bg-slate-900/90 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-cyan-400"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-blue-500 font-mono"
               />
             </div>
           )}
@@ -181,25 +181,25 @@ export default function OrderTicketModal({ isOpen, onClose }) {
           {/* Estado de Pago */}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <div>
-              <label className="text-xs font-mono text-gray-400 block mb-1">Condición de Pago</label>
+              <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Condición de Pago</label>
               <div className="flex flex-col gap-2">
-                <label className="flex items-center gap-2 p-2.5 rounded-xl border border-white/10 bg-slate-900/50 cursor-pointer text-xs">
+                <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer text-xs font-bold text-slate-800">
                   <input
                     type="radio"
                     name="paymentStatus"
                     checked={paymentStatus === 'paid'}
                     onChange={() => setPaymentStatus('paid')}
-                    className="text-cyan-500"
+                    className="text-blue-600"
                   />
                   <span>✅ Pagado Ahora</span>
                 </label>
-                <label className="flex items-center gap-2 p-2.5 rounded-xl border border-white/10 bg-slate-900/50 cursor-pointer text-xs">
+                <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer text-xs font-bold text-slate-800">
                   <input
                     type="radio"
                     name="paymentStatus"
                     checked={paymentStatus === 'pending'}
                     onChange={() => setPaymentStatus('pending')}
-                    className="text-cyan-500"
+                    className="text-blue-600"
                   />
                   <span>⏳ Al Retirar</span>
                 </label>
@@ -207,11 +207,11 @@ export default function OrderTicketModal({ isOpen, onClose }) {
             </div>
 
             <div>
-              <label className="text-xs font-mono text-gray-400 block mb-1">Método de Pago</label>
+              <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Método de Pago</label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full bg-slate-900/90 border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500"
               >
                 <option value="pago_movil">Pago Móvil</option>
                 <option value="usd_cash">Divisas ($ Efectivo)</option>
@@ -223,23 +223,23 @@ export default function OrderTicketModal({ isOpen, onClose }) {
 
           {/* Notas */}
           <div>
-            <label className="text-xs font-mono text-gray-400 block mb-1">Observaciones / Detalles</label>
+            <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Observaciones / Detalles</label>
             <input
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Ej. Ropa delicada, bolsa verde..."
-              className="w-full bg-slate-900/90 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-400"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:border-blue-500"
             />
           </div>
 
           {/* Resumen Final */}
-          <div className="p-4 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-between">
             <div>
-              <span className="text-[11px] uppercase font-mono text-gray-400 block">Total a Cobrar:</span>
-              <span className="text-2xl font-black text-cyan-400 font-mono">${totalUSD.toFixed(2)} USD</span>
+              <span className="text-[11px] uppercase font-mono text-slate-500 font-semibold block">Total a Cobrar:</span>
+              <span className="text-2xl font-black text-blue-700 font-mono">${totalUSD.toFixed(2)} USD</span>
             </div>
-            <div className="text-right text-xs text-gray-300 font-mono">
+            <div className="text-right text-xs text-slate-600 font-mono font-semibold">
               ~Bs. {totalBs.toFixed(2)}
             </div>
           </div>
@@ -248,13 +248,13 @@ export default function OrderTicketModal({ isOpen, onClose }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3.5 rounded-xl bg-slate-800 text-gray-300 font-bold text-xs uppercase"
+              className="flex-1 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 py-3.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs uppercase tracking-wider transition-all"
+              className="flex-1 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider transition-all shadow-xs"
             >
               Crear Ticket
             </button>
