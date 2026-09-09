@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { 
   Calculator, Plus, Minus, Sparkles, 
   MessageCircle, ArrowRight, RefreshCw, CheckCircle2,
-  Info
+  Info, AlertTriangle, ShieldCheck
 } from 'lucide-react';
 
 export default function BasketCalculator() {
@@ -24,42 +24,23 @@ export default function BasketCalculator() {
   const [directBaskets, setDirectBaskets] = useState(1);
   const [useDirectBaskets, setUseDirectBaskets] = useState(false);
 
-  // Modo de servicio: 'comboFull' ($7.50), 'washWithSoap' ($4.50), 'custom'
-  const [serviceMode, setServiceMode] = useState('comboFull');
+  // Plan base de servicio: 'comboFull' ($7.50) | 'washWithSoap' ($4.50) | 'custom'
+  const [basePlan, setBasePlan] = useState('comboFull');
 
-  // Opciones individuales
-  const [serviceWash, setServiceWash] = useState(true);          // $4.00
-  const [serviceDry, setServiceDry] = useState(true);            // $3.00
-  const [serviceSoap, setServiceSoap] = useState(true);          // $0.50
-  const [serviceSoftener, setServiceSoftener] = useState(true);  // $0.70
-  const [serviceBleach, setServiceBleach] = useState(false);     // $0.50
-  const [serviceLabor, setServiceLabor] = useState(true);        // $0.20
+  // Adicionales que se pueden sumar a cualquier combo sin perder el ahorro del paquete
+  const [addBleach, setAddBleach] = useState(false);         // Cloro: $0.50
+  const [addDegreaser, setAddDegreaser] = useState(false);   // Desengrasante: $0.50
 
-  const handlePresetChange = (mode) => {
-    setServiceMode(mode);
-    if (mode === 'comboFull') {
-      setServiceWash(true);
-      setServiceDry(true);
-      setServiceSoap(true);
-      setServiceSoftener(true);
-      setServiceBleach(false);
-      setServiceLabor(true);
-    } else if (mode === 'washWithSoap') {
-      setServiceWash(true);
-      setServiceDry(false);
-      setServiceSoap(true);
-      setServiceSoftener(false);
-      setServiceBleach(false);
-      setServiceLabor(true);
-    }
-  };
+  // Opciones exclusivas para cuando el cliente elige modo 'custom' (A tu medida)
+  const [customWash, setCustomWash] = useState(true);          // $4.00
+  const [customDry, setCustomDry] = useState(true);            // $3.00
+  const [customSoap, setCustomSoap] = useState(true);          // $0.50
+  const [customSoftener, setCustomSoftener] = useState(true);  // $0.70
+  const [customBleach, setCustomBleach] = useState(false);     // $0.50
+  const [customDegreaser, setCustomDegreaser] = useState(false); // $0.50
+  const [customLabor, setCustomLabor] = useState(true);        // $0.20
 
-  const toggleCustomService = (setter, currentValue) => {
-    setter(!currentValue);
-    setServiceMode('custom');
-  };
-
-  // Cálculos de prendas y peso
+  // Cálculos de prendas y capacidad
   const totalClothesCount = pants + shirts + towels + mixedClothes;
 
   const totalWeightApprox = 
@@ -88,36 +69,74 @@ export default function BasketCalculator() {
 
   const remainingKgInBasket = Math.max(0, BASKET_CAPACITY_KG - weightInCurrentBasket);
 
-  // Precio unitario por cesta
+  // Precio unitario por cesta según combo y productos adicionales
   let basketUnitPrice = 0;
-  if (serviceMode === 'comboFull') {
-    basketUnitPrice = prices.comboFull || 7.50;
-  } else if (serviceMode === 'washWithSoap') {
-    basketUnitPrice = prices.washWithSoapCombo || 4.50;
+  let planTitleSummary = '';
+  let extrasList = [];
+
+  const bleachPrice = prices.bleach ?? 0.50;
+  const degreaserPrice = prices.degreaser ?? 0.50;
+
+  if (basePlan === 'comboFull') {
+    let price = prices.comboFull || 7.50;
+    if (addBleach) {
+      price += bleachPrice;
+      extrasList.push(`Cloro (+$${bleachPrice.toFixed(2)})`);
+    }
+    if (addDegreaser) {
+      price += degreaserPrice;
+      extrasList.push(`Desengrasante (+$${degreaserPrice.toFixed(2)})`);
+    }
+    basketUnitPrice = price;
+    planTitleSummary = extrasList.length > 0 
+      ? `⭐ Combo Estrella VIP ($7.50) + ${extrasList.join(' + ')}`
+      : '⭐ Combo Estrella VIP ($7.50)';
+  } else if (basePlan === 'washWithSoap') {
+    let price = prices.washWithSoapCombo || 4.50;
+    if (addBleach) {
+      price += bleachPrice;
+      extrasList.push(`Cloro (+$${bleachPrice.toFixed(2)})`);
+    }
+    if (addDegreaser) {
+      price += degreaserPrice;
+      extrasList.push(`Desengrasante (+$${degreaserPrice.toFixed(2)})`);
+    }
+    basketUnitPrice = price;
+    planTitleSummary = extrasList.length > 0 
+      ? `💧 Lavado + Jabón ($4.50) + ${extrasList.join(' + ')}`
+      : '💧 Lavado + Jabón ($4.50)';
   } else {
+    // Modo A la Medida
     let customSum = 0;
-    if (serviceWash) customSum += (prices.washOnly || 4.00);
-    if (serviceDry) customSum += (prices.dryOnly || 3.00);
-    if (serviceSoap) customSum += (prices.soap || 0.50);
-    if (serviceSoftener) customSum += (prices.softener || 0.70);
-    if (serviceBleach) customSum += (prices.bleachDegreaser || 0.50);
-    if (serviceLabor) customSum += (prices.labor || 0.20);
+    const activeCustom = [];
+    if (customWash) { customSum += (prices.washOnly || 4.00); activeCustom.push('Lavado'); }
+    if (customDry) { customSum += (prices.dryOnly || 3.00); activeCustom.push('Secado'); }
+    if (customSoap) { customSum += (prices.soap || 0.50); activeCustom.push('Jabón'); }
+    if (customSoftener) { customSum += (prices.softener || 0.70); activeCustom.push('Suavizante'); }
+    if (customBleach) { customSum += bleachPrice; activeCustom.push('Cloro'); }
+    if (customDegreaser) { customSum += degreaserPrice; activeCustom.push('Desengrasante'); }
+    if (customLabor) { customSum += (prices.labor || 0.20); activeCustom.push('Mano de obra'); }
+    
     basketUnitPrice = customSum;
+    planTitleSummary = `🛠️ A tu Medida: ${activeCustom.length > 0 ? activeCustom.join(', ') : 'Ningún servicio'}`;
   }
 
-  // Subtotales
+  // Costo por cestas de ropa
   const subtotalClothes = effectiveBaskets * basketUnitPrice;
 
+  // Costo por Edredones
   const totalComfortersCount = comforterSingle + comforterDouble + comforterLarge;
   const subtotalComforters = 
     (comforterSingle * (prices.comforterSingle || 10.00)) +
     (comforterDouble * (prices.comforterDouble || 12.00)) +
     (comforterLarge * (prices.comforterMatrimonialLarge || 14.00));
 
+  // TOTAL ESTIMADO
   const totalUSD = subtotalClothes + subtotalComforters;
   const safeRate = exchangeRate || 40.50;
   const totalBs = totalUSD * safeRate;
 
+  // Reset
   const handleReset = () => {
     setPants(0);
     setShirts(0);
@@ -128,12 +147,16 @@ export default function BasketCalculator() {
     setComforterLarge(0);
     setDirectBaskets(1);
     setUseDirectBaskets(false);
-    handlePresetChange('comboFull');
+    setBasePlan('comboFull');
+    setAddBleach(false);
+    setAddDegreaser(false);
   };
 
+  // Mensaje para WhatsApp con la frase oficial requerida
   const generateWhatsAppMessage = () => {
     const lines = [];
     lines.push('🧺 *SOLICITUD DE COTIZACIÓN - LAVANDERÍA AJ*');
+    lines.push('_"El mejor servicio al mejor precio es nuestra mayor prioridad"_');
     lines.push('');
     
     if (useDirectBaskets) {
@@ -149,21 +172,8 @@ export default function BasketCalculator() {
 
     if (effectiveBaskets > 0) {
       lines.push('');
-      lines.push('⚙️ *Servicios seleccionados para la ropa:*');
-      if (serviceMode === 'comboFull') {
-        lines.push(`  - ⭐ COMBO ESTRELLA VIP: $${basketUnitPrice.toFixed(2)} c/u (Lavado + Secado + Jabón + Suavizante + Mano de Obra)`);
-      } else if (serviceMode === 'washWithSoap') {
-        lines.push(`  - 💧 Lavado + Jabón + Mano de Obra: $${basketUnitPrice.toFixed(2)} c/u`);
-      } else {
-        const activeSvcs = [];
-        if (serviceWash) activeSvcs.push('Lavado ($4.00)');
-        if (serviceDry) activeSvcs.push('Secado ($3.00)');
-        if (serviceSoap) activeSvcs.push('Jabón ($0.50)');
-        if (serviceSoftener) activeSvcs.push('Suavizante ($0.70)');
-        if (serviceBleach) activeSvcs.push('Cloro ($0.50)');
-        if (serviceLabor) activeSvcs.push('Mano de obra ($0.20)');
-        lines.push(`  - Personalizado ($${basketUnitPrice.toFixed(2)} c/u): ${activeSvcs.join(', ')}`);
-      }
+      lines.push(`⚙️ *Plan para la ropa:* ${planTitleSummary}`);
+      lines.push(`  ↳ Tarifa: $${basketUnitPrice.toFixed(2)} por cesta`);
       lines.push(`  ↳ Subtotal Ropa: *${effectiveBaskets} cesta(s) × $${basketUnitPrice.toFixed(2)} = $${subtotalClothes.toFixed(2)} USD*`);
     }
 
@@ -177,9 +187,11 @@ export default function BasketCalculator() {
     }
 
     lines.push('');
-    lines.push(`💰 *TOTAL GENERAL ESTIMADO:* *$${totalUSD.toFixed(2)} USD* (~Bs. ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`);
+    lines.push(`💰 *TOTAL ESTIMADO:* *$${totalUSD.toFixed(2)} USD* (~Bs. ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`);
     lines.push('');
-    lines.push('¿Tienen disponibilidad para recibir mi ropa hoy? ¡Muchas gracias!');
+    lines.push('⚠️ *Nota importante:* Entiendo que este monto es un presupuesto estimado y estará sujeto a ajustes por el operario al momento de recibir la ropa en el local.');
+    lines.push('');
+    lines.push('¿Tienen disponibilidad para recibirme hoy? ¡Muchas gracias!');
 
     return encodeURIComponent(lines.join('\n'));
   };
@@ -187,7 +199,7 @@ export default function BasketCalculator() {
   return (
     <div className="rounded-3xl bg-white border border-blue-200/80 shadow-lg shadow-blue-900/5 p-6 sm:p-8 mb-8">
       
-      {/* Header del Simulador */}
+      {/* Header del Simulador con el eslogan */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-blue-100">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider mb-2 border border-blue-200">
@@ -197,8 +209,9 @@ export default function BasketCalculator() {
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             Calcula tu Presupuesto al Instante
           </h2>
-          <p className="text-sm text-slate-600 mt-1">
-            Ingresa tu cantidad de ropa o edredones, personaliza los servicios y comprueba el precio exacto en tiempo real.
+          <p className="text-xs sm:text-sm font-semibold text-blue-800 mt-1 flex items-center gap-1.5">
+            <Sparkles size={14} className="text-amber-500 shrink-0" />
+            <span>El mejor servicio al mejor precio es nuestra mayor prioridad</span>
           </p>
         </div>
 
@@ -237,7 +250,7 @@ export default function BasketCalculator() {
         </div>
 
         {useDirectBaskets ? (
-          <div key="direct-baskets-mode" className="p-6 rounded-2xl bg-blue-50/50 border border-blue-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div key="direct-baskets-box" className="p-6 rounded-2xl bg-blue-50/50 border border-blue-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
               <p className="font-bold text-slate-900 text-sm">¿Cuántas cestas completas vas a lavar?</p>
               <p className="text-xs text-slate-500">Capacidad estándar de 5 a 7 kilos en seco por cesta.</p>
@@ -261,7 +274,7 @@ export default function BasketCalculator() {
             </div>
           </div>
         ) : (
-          <div key="garments-mode">
+          <div key="clothes-garments-box">
             {/* Grid de prendas ordinarias */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               
@@ -470,40 +483,40 @@ export default function BasketCalculator() {
         )}
       </div>
 
-      {/* SECCIÓN 2: SELECCIÓN DE SERVICIOS */}
+      {/* SECCIÓN 2: SELECCIÓN DE PLANES Y ADICIONALES */}
       <div className="py-6 border-b border-blue-100">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">2</span>
-            <span>Elige los Servicios para tu Ropa:</span>
+            <span>Elige el Plan para tus Cestas:</span>
           </h3>
-          <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
-            Tarifa actual: <strong className="text-blue-900">${basketUnitPrice.toFixed(2)}</strong> / cesta
+          <span className="text-xs font-semibold text-blue-900 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200">
+            Tarifa por cesta: <strong className="text-blue-700 font-black text-sm">${basketUnitPrice.toFixed(2)} USD</strong>
           </span>
         </div>
 
-        {/* Planes / Presets */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        {/* 3 Planes Base */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
           
           {/* Combo Estrella */}
           <div 
-            onClick={() => handlePresetChange('comboFull')} 
+            onClick={() => setBasePlan('comboFull')} 
             className={`cursor-pointer rounded-2xl p-4 border-2 transition-all relative ${
-              serviceMode === 'comboFull' 
+              basePlan === 'comboFull' 
                 ? 'bg-blue-50/80 border-blue-600 shadow-md ring-2 ring-blue-500/20' 
                 : 'bg-white border-slate-200 hover:border-blue-300'
             }`}
           >
-            {serviceMode === 'comboFull' && (
+            {basePlan === 'comboFull' && (
               <span className="absolute top-3 right-3 text-blue-600">
                 <CheckCircle2 size={18} />
               </span>
             )}
             <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-              Más Popular
+              Más Popular & Ahorro
             </span>
             <h4 className="font-black text-slate-900 text-sm mt-1.5">COMBO ESTRELLA VIP</h4>
-            <p className="text-[11px] text-slate-600 mt-1 mb-2">
+            <p className="text-[11px] text-slate-600 mt-1 mb-2 leading-tight">
               Lavado + Secado + Jabón + Suavizante + Mano de Obra
             </p>
             <div className="flex items-baseline gap-1">
@@ -514,14 +527,14 @@ export default function BasketCalculator() {
 
           {/* Lavado + Jabón */}
           <div 
-            onClick={() => handlePresetChange('washWithSoap')} 
+            onClick={() => setBasePlan('washWithSoap')} 
             className={`cursor-pointer rounded-2xl p-4 border-2 transition-all relative ${
-              serviceMode === 'washWithSoap' 
+              basePlan === 'washWithSoap' 
                 ? 'bg-blue-50/80 border-blue-600 shadow-md ring-2 ring-blue-500/20' 
                 : 'bg-white border-slate-200 hover:border-blue-300'
             }`}
           >
-            {serviceMode === 'washWithSoap' && (
+            {basePlan === 'washWithSoap' && (
               <span className="absolute top-3 right-3 text-blue-600">
                 <CheckCircle2 size={18} />
               </span>
@@ -530,7 +543,7 @@ export default function BasketCalculator() {
               Económico
             </span>
             <h4 className="font-black text-slate-900 text-sm mt-1.5">LAVADO + JABÓN</h4>
-            <p className="text-[11px] text-slate-600 mt-1 mb-2">
+            <p className="text-[11px] text-slate-600 mt-1 mb-2 leading-tight">
               Lavado + Jabón + Mano de Obra (Tú la secas en casa)
             </p>
             <div className="flex items-baseline gap-1">
@@ -541,14 +554,14 @@ export default function BasketCalculator() {
 
           {/* A Medida */}
           <div 
-            onClick={() => handlePresetChange('custom')} 
+            onClick={() => setBasePlan('custom')} 
             className={`cursor-pointer rounded-2xl p-4 border-2 transition-all relative ${
-              serviceMode === 'custom' 
+              basePlan === 'custom' 
                 ? 'bg-blue-50/80 border-blue-600 shadow-md ring-2 ring-blue-500/20' 
                 : 'bg-white border-slate-200 hover:border-blue-300'
             }`}
           >
-            {serviceMode === 'custom' && (
+            {basePlan === 'custom' && (
               <span className="absolute top-3 right-3 text-blue-600">
                 <CheckCircle2 size={18} />
               </span>
@@ -557,8 +570,8 @@ export default function BasketCalculator() {
               Personalizado
             </span>
             <h4 className="font-black text-slate-900 text-sm mt-1.5">A TU MEDIDA</h4>
-            <p className="text-[11px] text-slate-600 mt-1 mb-2">
-              Elige exactamente qué productos y procesos deseas
+            <p className="text-[11px] text-slate-600 mt-1 mb-2 leading-tight">
+              Arma tu paquete desde cero eligiendo cada servicio
             </p>
             <div className="flex items-baseline gap-1">
               <span className="text-xl font-black text-blue-700">${basketUnitPrice.toFixed(2)}</span>
@@ -567,41 +580,125 @@ export default function BasketCalculator() {
           </div>
         </div>
 
-        {/* Botones de Servicios Individuales */}
-        <p className="text-xs font-bold text-slate-700 mb-2">
-          Activa o desactiva servicios individuales para recalcular:
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          {[
-            { id: 'wash', label: 'Lavado', price: prices.washOnly || 4.00, setter: setServiceWash, val: serviceWash, icon: '🫧' },
-            { id: 'dry', label: 'Secado', price: prices.dryOnly || 3.00, setter: setServiceDry, val: serviceDry, icon: '💨' },
-            { id: 'soap', label: 'Jabón', price: prices.soap || 0.50, setter: setServiceSoap, val: serviceSoap, icon: '🧴' },
-            { id: 'soft', label: 'Suavizante', price: prices.softener || 0.70, setter: setServiceSoftener, val: serviceSoftener, icon: '🌸' },
-            { id: 'bleach', label: 'Cloro/Desengr.', price: prices.bleachDegreaser || 0.50, setter: setServiceBleach, val: serviceBleach, icon: '🧪' },
-            { id: 'labor', label: 'Mano de Obra', price: prices.labor || 0.20, setter: setServiceLabor, val: serviceLabor, icon: '👔' }
-          ].map((svc) => (
-            <button 
-              key={svc.id} 
-              onClick={() => toggleCustomService(svc.setter, svc.val)} 
-              className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-1 shadow-xs active:scale-95 ${
-                svc.val 
-                  ? 'bg-blue-50 border-blue-500 text-blue-900 ring-1 ring-blue-400' 
-                  : 'bg-white border-slate-200 text-slate-400 opacity-60 hover:opacity-100'
-              }`}
-            >
-              <span className="text-xl">{svc.icon}</span>
-              <span className="text-[11px] font-black">{svc.label}</span>
-              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
-                svc.val ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500'
-              }`}>
-                ${svc.price.toFixed(2)}
-              </span>
-            </button>
-          ))}
-        </div>
+        {/* SI ESTÁ EN COMBO: SECCIÓN DE PRODUCTOS ESPECIALES ADICIONALES (CLORO Y DESENGRASANTE) */}
+        {basePlan !== 'custom' ? (
+          <div key="combo-addons" className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">✨</span>
+                <div>
+                  <h4 className="font-black text-slate-900 text-xs sm:text-sm">
+                    ¿Deseas agregar Cloro o Desengrasante a tu combo?
+                  </h4>
+                  <p className="text-[11px] text-slate-600">
+                    Se suman directamente a tu combo por solo <strong>$0.50 c/u</strong> sin perder tu tarifa con descuento.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+              
+              {/* Botón Cloro */}
+              <button
+                type="button"
+                onClick={() => setAddBleach(!addBleach)}
+                className={`p-3 rounded-xl border flex items-center justify-between text-left transition-all active:scale-98 ${
+                  addBleach 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                    : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🧪</span>
+                  <div>
+                    <p className="font-black text-xs">Cloro Blanqueador</p>
+                    <p className={`text-[10px] ${addBleach ? 'text-blue-100' : 'text-slate-500'}`}>
+                      Ideal para prendas blancas o percudidas
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-black px-2 py-0.5 rounded ${addBleach ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-700'}`}>
+                    +$0.50
+                  </span>
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${addBleach ? 'bg-white text-blue-600' : 'border border-slate-300'}`}>
+                    {addBleach ? '✓' : ''}
+                  </span>
+                </div>
+              </button>
+
+              {/* Botón Desengrasante */}
+              <button
+                type="button"
+                onClick={() => setAddDegreaser(!addDegreaser)}
+                className={`p-3 rounded-xl border flex items-center justify-between text-left transition-all active:scale-98 ${
+                  addDegreaser 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                    : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🧽</span>
+                  <div>
+                    <p className="font-black text-xs">Desengrasante Industrial</p>
+                    <p className={`text-[10px] ${addDegreaser ? 'text-blue-100' : 'text-slate-500'}`}>
+                      Grasa pesada, mecánicos, manchas difíciles
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-black px-2 py-0.5 rounded ${addDegreaser ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-700'}`}>
+                    +$0.50
+                  </span>
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${addDegreaser ? 'bg-white text-blue-600' : 'border border-slate-300'}`}>
+                    {addDegreaser ? '✓' : ''}
+                  </span>
+                </div>
+              </button>
+
+            </div>
+          </div>
+        ) : (
+          /* MODO A TU MEDIDA: SELECTOR COMPLETO */
+          <div key="custom-service-buttons" className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+            <p className="text-xs font-bold text-slate-700">
+              Selecciona los servicios individuales que deseas contratar:
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+              {[
+                { id: 'wash', label: 'Lavado', price: prices.washOnly || 4.00, setter: setCustomWash, val: customWash, icon: '🫧' },
+                { id: 'dry', label: 'Secado', price: prices.dryOnly || 3.00, setter: setCustomDry, val: customDry, icon: '💨' },
+                { id: 'soap', label: 'Jabón', price: prices.soap || 0.50, setter: setCustomSoap, val: customSoap, icon: '🧴' },
+                { id: 'soft', label: 'Suaviz.', price: prices.softener || 0.70, setter: setCustomSoftener, val: customSoftener, icon: '🌸' },
+                { id: 'bleach', label: 'Cloro', price: bleachPrice, setter: setCustomBleach, val: customBleach, icon: '🧪' },
+                { id: 'degreaser', label: 'Desengr.', price: degreaserPrice, setter: setCustomDegreaser, val: customDegreaser, icon: '🧽' },
+                { id: 'labor', label: 'Mano Obra', price: prices.labor || 0.20, setter: setCustomLabor, val: customLabor, icon: '👔' }
+              ].map((svc) => (
+                <button 
+                  key={svc.id} 
+                  onClick={() => svc.setter(!svc.val)} 
+                  className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-between gap-1 shadow-xs active:scale-95 ${
+                    svc.val 
+                      ? 'bg-blue-50 border-blue-500 text-blue-900 ring-1 ring-blue-400' 
+                      : 'bg-white border-slate-200 text-slate-400 opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <span className="text-lg">{svc.icon}</span>
+                  <span className="text-[11px] font-black">{svc.label}</span>
+                  <span className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded ${
+                    svc.val ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    ${svc.price.toFixed(2)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* SECCIÓN 3: CUADRO DE RESUMEN CLARO Y BOTÓN WHATSAPP */}
+      {/* SECCIÓN 3: CUADRO DE RESUMEN CLARO, AVISO OBLIGATORIO Y BOTÓN WHATSAPP */}
       <div className="pt-6">
         <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-blue-900 text-white shadow-xl flex flex-col lg:flex-row items-center justify-between gap-6 border border-blue-800">
           
@@ -644,7 +741,7 @@ export default function BasketCalculator() {
               {/* Plan activo */}
               {effectiveBaskets > 0 ? (
                 <div key="summary-plan-name" className="text-[11px] text-cyan-200/90 pt-1">
-                  Plan: {serviceMode === 'comboFull' ? '⭐ Combo Estrella VIP ($7.50)' : serviceMode === 'washWithSoap' ? '💧 Lavado + Jabón ($4.50)' : '🛠️ Personalizado'}
+                  Plan: <strong>{planTitleSummary}</strong>
                 </div>
               ) : null}
             </div>
@@ -659,9 +756,17 @@ export default function BasketCalculator() {
               </div>
             </div>
 
+            {/* FRASE OBLIGATORIA SOLICITADA */}
+            <div className="mt-2 p-2.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs flex items-start gap-2 max-w-xl">
+              <AlertTriangle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+              <span className="font-medium leading-relaxed">
+                <strong>Nota:</strong> El monto final estará sujeto a ajustes por el operario al momento de recibir la ropa.
+              </span>
+            </div>
+
             {totalUSD === 0 ? (
-              <p key="summary-zero-tip" className="text-[11px] text-amber-300 font-semibold">
-                👆 Ingresa prendas o edredones arriba para calcular tu monto exacto.
+              <p key="summary-zero-tip" className="text-[11px] text-cyan-300 font-semibold">
+                👆 Ingresa prendas o edredones arriba para calcular tu monto estimado.
               </p>
             ) : null}
           </div>

@@ -7,7 +7,9 @@ export const INITIAL_PRICES = {
   dryOnly: 3.00,
   soap: 0.50,
   softener: 0.70,
-  bleachDegreaser: 0.50,
+  bleach: 0.50,            // Cloro por cesta
+  degreaser: 0.50,         // Desengrasante por cesta
+  bleachDegreaser: 0.50,   // Compatibilidad
   labor: 0.20,
   comboFull: 7.50,         // Lavado + Secado + Jabón + Suavizante + Mano de Obra
   washWithSoapCombo: 4.50, // Solo Lavado + Jabón + Mano de Obra

@@ -51,6 +51,12 @@ export default function HeaderStatus() {
             {isOpen ? 'Abierto Ahora para Recepción y Entrega' : 'Cerrado en este momento'}
           </div>
 
+          {/* Slogan oficial destacado */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-600/10 text-blue-900 border border-blue-200 text-xs sm:text-sm font-black mb-3">
+            <Sparkles size={16} className="text-amber-500 shrink-0" />
+            <span>El mejor servicio al mejor precio es nuestra mayor prioridad</span>
+          </div>
+
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight">
             LAVANDERÍA <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600">AJ</span>
           </h1>

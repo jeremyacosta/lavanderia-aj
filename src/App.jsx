@@ -76,6 +76,13 @@ export default function App() {
     <AppProvider>
       <div className="min-h-screen bg-[#EEF5FB] text-slate-900 flex flex-col justify-between selection:bg-blue-500 selection:text-white">
         
+        {/* Top Slogan Banner */}
+        <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 text-white py-2 px-4 text-center text-xs sm:text-sm font-black tracking-wide shadow-xs flex items-center justify-center gap-2">
+          <Sparkles size={15} className="text-amber-300 shrink-0" />
+          <span>El mejor servicio al mejor precio es nuestra mayor prioridad</span>
+          <Sparkles size={15} className="text-amber-300 shrink-0 hidden sm:inline" />
+        </div>
+
         {/* Top Navbar */}
         <header className="sticky top-0 z-40 border-b border-blue-200/70 bg-white/90 backdrop-blur-md shadow-xs">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
