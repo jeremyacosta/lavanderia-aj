@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Phone, MapPin, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Clock, Phone, MapPin, Sparkles, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 
 export default function HeaderStatus() {
+  const { exchangeRate, euroRate, fetchBcvRates, bcvLoading } = useApp();
   const [isOpen, setIsOpen] = useState(false);
   const [currentTimeText, setCurrentTimeText] = useState('');
   const [currentDayText, setCurrentDayText] = useState('');
@@ -71,6 +73,34 @@ export default function HeaderStatus() {
             <span className="flex items-center gap-1.5 text-blue-800 font-semibold bg-white/80 px-2.5 py-1 rounded-lg border border-blue-200 text-xs">
               <Clock size={14} className="text-blue-600 shrink-0" /> Dom: 9:00 AM a 4:00 PM
             </span>
+          </div>
+
+          {/* Tasa Oficial BCV en Vivo (Dólar y Euro) */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="inline-flex flex-wrap items-center gap-2 bg-gradient-to-r from-slate-900 via-blue-950 to-blue-900 text-white px-3.5 py-1.5 rounded-xl shadow-xs border border-blue-800/80 text-xs">
+              <div className="flex items-center gap-1.5 text-cyan-300 font-extrabold text-[11px] uppercase tracking-wider">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Tasa Oficial BCV:</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 font-mono font-bold text-xs">
+                <span>
+                  💵 $ 1 = <strong className="text-emerald-300 font-black">Bs. {exchangeRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                </span>
+                <span className="text-blue-400/60 hidden sm:inline">•</span>
+                <span>
+                  💶 € 1 = <strong className="text-cyan-300 font-black">Bs. {euroRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => fetchBcvRates()}
+                title="Actualizar tasa oficial BCV ahora"
+                disabled={bcvLoading}
+                className="p-1 rounded-md text-cyan-300 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <RefreshCw size={12} className={bcvLoading ? 'animate-spin' : ''} />
+              </button>
+            </div>
           </div>
         </div>
 

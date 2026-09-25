@@ -30,11 +30,96 @@ const DEFAULT_MACHINES = [
 ];
 
 export function AppProvider({ children }) {
-  // Configuración general
+  // Configuración general de tasas (USD y EUR oficiales del BCV)
   const [exchangeRate, setExchangeRate] = useState(() => {
     const saved = localStorage.getItem('aj_exchange_rate');
-    return saved ? parseFloat(saved) : 40.50; // Tasa Bs/$
+    return saved ? parseFloat(saved) : 855.66; // Tasa oficial BCV USD
   });
+
+  const [euroRate, setEuroRate] = useState(() => {
+    const saved = localStorage.getItem('aj_euro_rate');
+    return saved ? parseFloat(saved) : 972.65; // Tasa oficial BCV EUR
+  });
+
+  const [bcvLastUpdated, setBcvLastUpdated] = useState(() => {
+    return localStorage.getItem('aj_bcv_last_updated') || new Date().toLocaleDateString('es-VE');
+  });
+
+  const [bcvLoading, setBcvLoading] = useState(false);
+
+  // Función para consultar las tasas oficiales del Banco Central de Venezuela en vivo
+  const fetchBcvRates = async () => {
+    setBcvLoading(true);
+    try {
+      // Consultar APIs oficiales de Venezuela
+      const [resUsd, resEur] = await Promise.allSettled([
+        fetch('https://ve.dolarapi.com/v1/dolares/oficial'),
+        fetch('https://ve.dolarapi.com/v1/euros/oficial')
+      ]);
+
+      let usdRate = null;
+      let eurRate = null;
+      let updateDate = null;
+
+      if (resUsd.status === 'fulfilled' && resUsd.value.ok) {
+        const dataUsd = await resUsd.value.json();
+        if (dataUsd && typeof dataUsd.promedio === 'number' && dataUsd.promedio > 0) {
+          usdRate = dataUsd.promedio;
+          updateDate = dataUsd.fechaActualizacion;
+        }
+      }
+
+      if (resEur.status === 'fulfilled' && resEur.value.ok) {
+        const dataEur = await resEur.value.json();
+        if (dataEur && typeof dataEur.promedio === 'number' && dataEur.promedio > 0) {
+          eurRate = dataEur.promedio;
+        }
+      }
+
+      // Fallback si la primera API no respondió
+      if (!usdRate) {
+        const fallbackRes = await fetch('https://open.er-api.com/v6/latest/USD');
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          if (fallbackData?.rates?.VES) {
+            usdRate = fallbackData.rates.VES;
+            if (fallbackData?.rates?.EUR) {
+              eurRate = usdRate / fallbackData.rates.EUR;
+            }
+          }
+        }
+      }
+
+      if (usdRate) {
+        setExchangeRate(usdRate);
+        localStorage.setItem('aj_exchange_rate', usdRate.toString());
+      }
+      if (eurRate) {
+        setEuroRate(eurRate);
+        localStorage.setItem('aj_euro_rate', eurRate.toString());
+      }
+
+      const formattedDate = updateDate 
+        ? new Date(updateDate).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : new Date().toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      
+      setBcvLastUpdated(formattedDate);
+      localStorage.setItem('aj_bcv_last_updated', formattedDate);
+      return { success: true, usd: usdRate, eur: eurRate };
+    } catch (err) {
+      console.warn('[BCV Sync] Error al obtener tasa automática:', err);
+      return { success: false, error: err };
+    } finally {
+      setBcvLoading(false);
+    }
+  };
+
+  // Actualización automática al abrir la aplicación y cada 30 minutos
+  useEffect(() => {
+    fetchBcvRates();
+    const interval = setInterval(fetchBcvRates, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Clientes
   const [customers, setCustomers] = useState(() => {
@@ -570,6 +655,11 @@ export function AppProvider({ children }) {
       prices: INITIAL_PRICES,
       exchangeRate,
       setExchangeRate,
+      euroRate,
+      setEuroRate,
+      bcvLastUpdated,
+      bcvLoading,
+      fetchBcvRates,
       customers,
       orders,
       expenses,

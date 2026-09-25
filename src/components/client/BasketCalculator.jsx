@@ -194,7 +194,7 @@ export default function BasketCalculator() {
     }
 
     lines.push('');
-    lines.push(`💰 *TOTAL ESTIMADO:* *$${totalUSD.toFixed(2)} USD* (~Bs. ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`);
+    lines.push(`💰 *TOTAL ESTIMADO:* *$${totalUSD.toFixed(2)} USD* (+ IVA) (~Bs. ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + IVA)`);
     lines.push('');
     lines.push('⚠️ *Nota importante:* Entiendo que este monto es un presupuesto estimado y estará sujeto a ajustes por el operario al momento de recibir la ropa en el local.');
     lines.push('');
@@ -795,13 +795,16 @@ export default function BasketCalculator() {
               ) : null}
             </div>
 
-            {/* Total General Grande */}
+            {/* Total General Grande con + iva sutil */}
             <div className="pt-2 border-t border-blue-800/80 flex flex-wrap items-baseline gap-2 sm:gap-3">
-              <div className="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">
-                ${totalUSD.toFixed(2)} <span className="text-base sm:text-lg font-bold text-cyan-300">USD</span>
+              <div className="flex items-baseline gap-1 text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">
+                <span>${totalUSD.toFixed(2)}</span>
+                <span className="text-base sm:text-lg font-bold text-cyan-300">USD</span>
+                <span className="text-[11px] font-medium text-slate-400 lowercase tracking-normal ml-0.5 select-none">+ iva</span>
               </div>
-              <div className="text-xs sm:text-sm font-bold text-slate-300">
-                ≈ Bs. {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div className="text-xs sm:text-sm font-bold text-slate-300 flex items-baseline gap-1">
+                <span>≈ Bs. {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="text-[10px] font-medium text-slate-400 lowercase select-none">+ iva</span>
               </div>
             </div>
 
@@ -902,9 +905,15 @@ export default function BasketCalculator() {
             </div>
 
             <div className="mb-4 p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-xs text-blue-950 space-y-1">
-              <div className="flex justify-between font-bold">
+              <div className="flex justify-between items-baseline font-bold">
                 <span>Total Estimado:</span>
-                <span className="text-blue-700 font-mono font-black text-sm">${totalUSD.toFixed(2)} USD</span>
+                <div className="text-right">
+                  <span className="text-blue-700 font-mono font-black text-sm">${totalUSD.toFixed(2)} USD</span>
+                  <span className="text-[10px] font-medium text-slate-500 lowercase ml-1 select-none">+ iva</span>
+                  <div className="text-[10px] text-slate-500 font-mono font-normal">
+                    ≈ Bs. {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="lowercase select-none">+ iva</span>
+                  </div>
+                </div>
               </div>
               <p className="text-[11px] text-slate-600">
                 {effectiveBaskets > 0 && `• ${effectiveBaskets} cesta(s) (${planTitleSummary})`}

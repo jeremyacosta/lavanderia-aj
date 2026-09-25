@@ -21,6 +21,10 @@ export default function EmployeeWorkStation() {
     dailyClosures, 
     saveDailyClosure, 
     exchangeRate,
+    euroRate,
+    bcvLastUpdated,
+    bcvLoading,
+    fetchBcvRates,
     prices
   } = useApp();
 
@@ -502,6 +506,30 @@ export default function EmployeeWorkStation() {
           <p className="text-xs sm:text-sm text-slate-300 mt-1">
             Digitalización del cuaderno físico de Lavandería AJ. Carga de prendas, abonos, ropa en depósito y cierres.
           </p>
+
+          {/* Tasa Oficial BCV en Personal LAV */}
+          <div className="flex flex-wrap items-center gap-2 mt-3 pt-2.5 border-t border-blue-800/80 text-xs">
+            <span className="flex items-center gap-1.5 text-cyan-300 font-extrabold uppercase tracking-wider text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Tasa Oficial BCV:</span>
+            </span>
+            <span className="font-mono font-bold text-white">
+              💵 $ 1 = <strong className="text-emerald-300">Bs. {exchangeRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+            </span>
+            <span className="text-blue-400/60">•</span>
+            <span className="font-mono font-bold text-white">
+              💶 € 1 = <strong className="text-cyan-300">Bs. {(euroRate || 972.65).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => fetchBcvRates()}
+              disabled={bcvLoading}
+              title="Actualizar tasa BCV oficial ahora"
+              className="p-1 rounded-md text-cyan-300 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <RefreshCw size={12} className={bcvLoading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
@@ -685,7 +713,7 @@ export default function EmployeeWorkStation() {
                     className="w-full px-3 py-2 rounded-xl border border-blue-300 text-xs font-mono font-black text-blue-950 bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <span className="text-[10px] text-blue-700 font-semibold block mt-0.5">
-                    ≈ Bs. {((parseFloat(inlineAmountUSD) || 0) * (exchangeRate || 40.50)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                    ≈ Bs. {((parseFloat(inlineAmountUSD) || 0) * (exchangeRate || 855.66)).toLocaleString('es-VE', { minimumFractionDigits: 2 })} <span className="text-slate-400 font-normal lowercase select-none">+ iva</span>
                   </span>
                 </div>
 
