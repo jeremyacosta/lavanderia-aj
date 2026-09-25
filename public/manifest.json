@@ -1,22 +1,36 @@
 {
   "name": "Lavandería AJ",
   "short_name": "Lavandería AJ",
-  "description": "Sistema y catálogo oficial de Lavandería AJ",
+  "description": "Sistema Oficial, Cotizador y Catálogo PWA de Lavandería AJ",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#080E1E",
-  "theme_color": "#06B6D4",
+  "background_color": "#0284C7",
+  "theme_color": "#0284C7",
   "orientation": "portrait-primary",
   "icons": [
     {
       "src": "/pwa-icon-192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
       "src": "/pwa-icon-512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-icon-maskable-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/pwa-icon-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ]
 }

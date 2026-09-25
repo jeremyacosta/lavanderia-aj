@@ -1,5 +1,15 @@
-const CACHE_NAME = 'lavanderia-aj-v2';
-const ASSETS_TO_CACHE = ['/', '/index.html', '/manifest.json', '/pwa-icon-192.png', '/pwa-icon-512.png', '/favicon.svg'];
+const CACHE_NAME = 'lavanderia-aj-v3';
+const ASSETS_TO_CACHE = [
+  '/', 
+  '/index.html', 
+  '/manifest.json', 
+  '/pwa-icon-192.png', 
+  '/pwa-icon-512.png', 
+  '/pwa-icon-maskable-192.png', 
+  '/pwa-icon-maskable-512.png', 
+  '/apple-touch-icon.png', 
+  '/favicon.svg'
+];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
