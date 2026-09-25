@@ -1,11 +1,11 @@
-const CACHE_NAME = 'lavanderia-aj-v1';
+const CACHE_NAME = 'lavanderia-aj-v2';
 const ASSETS_TO_CACHE = ['/', '/index.html', '/manifest.json', '/pwa-icon-192.png', '/pwa-icon-512.png', '/favicon.svg'];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE).catch(() => {}))
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -15,17 +15,36 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Estrategia Network-First para documentos y páginas (garantiza que siempre veas la última versión)
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  // Para navegación y HTML, siempre buscar en internet primero
+  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request) || caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // Para otros recursos (imágenes, fuentes, etc.)
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((res) => {
+    fetch(event.request)
+      .then((res) => {
         if (res && res.status === 200) {
           const clone = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return res;
-      }).catch(() => cached);
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });
