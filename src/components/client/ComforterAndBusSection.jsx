@@ -33,11 +33,11 @@ export default function ComforterAndBusSection() {
   return (
     <div className="space-y-8 mb-12">
       {/* 1. Edredones Section */}
-      <div className="rounded-3xl bg-white p-6 sm:p-8 border border-blue-200/80 shadow-md shadow-blue-900/5">
+      <div className="rounded-3xl bg-white p-4 sm:p-8 border border-blue-200/80 shadow-md shadow-blue-900/5 w-full max-w-full overflow-hidden">
         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider mb-2 border border-blue-200 w-fit">
           <Bed size={14} className="text-blue-600" /> Servicio Especial de Edredones
         </div>
-        <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-2">
+        <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-2 break-words">
           Lavado & Secado Completo de Edredones
         </h2>
         <p className="text-xs sm:text-sm text-slate-600 mb-6">
@@ -83,13 +83,13 @@ export default function ComforterAndBusSection() {
       </div>
 
       {/* 2. Forros de Autobuses Section */}
-      <div className="rounded-3xl bg-gradient-to-br from-amber-50/80 via-white to-amber-50/40 p-6 sm:p-8 border border-amber-200 shadow-md shadow-amber-900/5">
+      <div className="rounded-3xl bg-gradient-to-br from-amber-50/80 via-white to-amber-50/40 p-4 sm:p-8 border border-amber-200 shadow-md shadow-amber-900/5 w-full max-w-full overflow-hidden">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold uppercase tracking-wider mb-3 border border-amber-200">
               <Truck size={14} className="text-amber-700" /> Plan Especial Autobuseros & Transporte
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 break-words">
               Lavado Completo para Forros de Autobuses y Camionetas
             </h2>
             <p className="text-slate-600 text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">

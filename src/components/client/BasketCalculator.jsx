@@ -246,25 +246,25 @@ export default function BasketCalculator() {
   };
 
   return (
-    <div className="rounded-3xl bg-white border border-blue-200/80 shadow-lg shadow-blue-900/5 p-6 sm:p-8 mb-8">
+    <div className="rounded-3xl bg-white border border-blue-200/80 shadow-lg shadow-blue-900/5 p-4 sm:p-8 mb-8 w-full max-w-full overflow-hidden">
       
       {/* Header del Simulador con el eslogan */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-blue-100">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider mb-2 border border-blue-200">
-            <Calculator size={14} className="text-blue-600" />
-            <span>Simulador Inteligente de Cestas y Prendas</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider mb-2 border border-blue-200 max-w-full">
+            <Calculator size={14} className="text-blue-600 shrink-0" />
+            <span className="truncate">Simulador Inteligente de Cestas y Prendas</span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight break-words">
             Calcula tu Presupuesto al Instante
           </h2>
-          <p className="text-xs sm:text-sm font-semibold text-blue-800 mt-1 flex items-center gap-1.5">
+          <p className="text-xs sm:text-sm font-semibold text-blue-800 mt-1 flex items-center gap-1.5 flex-wrap">
             <Sparkles size={14} className="text-amber-500 shrink-0" />
             <span>El mejor servicio al mejor precio es nuestra mayor prioridad</span>
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setUseDirectBaskets(!useDirectBaskets)}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
@@ -288,12 +288,12 @@ export default function BasketCalculator() {
 
       {/* SECCIÓN 1: INGRESO DE PRENDAS O CESTAS */}
       <div className="py-6 border-b border-blue-100">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+            <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold shrink-0">1</span>
             <span>{useDirectBaskets ? 'Indica tus Cestas de Ropa:' : 'Ingresa la Cantidad de tus Prendas:'}</span>
           </h3>
-          <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
+          <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 w-fit">
             1 Cesta = 5 a 7 kg en seco (~6 kg promedio)
           </span>
         </div>
@@ -438,7 +438,7 @@ export default function BasketCalculator() {
 
             {/* SECCIÓN EDREDONES */}
             <div className="mt-4 p-4 rounded-2xl bg-sky-50/60 border border-sky-200">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">🛏️</span>
                   <div>
@@ -446,7 +446,7 @@ export default function BasketCalculator() {
                     <p className="text-[11px] text-slate-600">Se lavan y secan individualmente en ciclo especial completo</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">
+                <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full self-start sm:self-auto shrink-0">
                   ❌ No King Size
                 </span>
               </div>
@@ -485,14 +485,14 @@ export default function BasketCalculator() {
             {totalClothesCount > 0 ? (
               <div key="basket-progress-bar" className="mt-4 p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-2">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[11px]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[11px] shrink-0">
                       {effectiveBaskets}
                     </span>
                     <span className="font-extrabold text-slate-900 text-sm">
                       {effectiveBaskets === 1 ? '1 Cesta Requerida' : `${effectiveBaskets} Cestas Requeridas`}
                     </span>
-                    <span className="text-slate-500 font-medium">
+                    <span className="text-slate-500 font-medium text-[11px]">
                       ({totalClothesCount} prendas • ~{totalWeightApprox.toFixed(1)} kg)
                     </span>
                   </div>
@@ -511,7 +511,7 @@ export default function BasketCalculator() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-slate-600">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-600">
                   <span>
                     💡 Capacidad de cesta: Se cobra por cesta de 5 a 7 kg.
                   </span>
@@ -749,7 +749,7 @@ export default function BasketCalculator() {
 
       {/* SECCIÓN 3: CUADRO DE RESUMEN CLARO, AVISO OBLIGATORIO Y BOTÓN WHATSAPP */}
       <div className="pt-6">
-        <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-blue-900 text-white shadow-xl flex flex-col lg:flex-row items-center justify-between gap-6 border border-blue-800">
+        <div className="p-4 sm:p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-blue-900 text-white shadow-xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-6 border border-blue-800 w-full max-w-full overflow-hidden">
           
           {/* Desglose dinámico del resumen */}
           <div className="space-y-3 w-full lg:w-auto">
@@ -761,7 +761,7 @@ export default function BasketCalculator() {
             <div className="space-y-1.5 text-xs text-slate-200">
               {/* Línea de Ropa ordinaria */}
               {effectiveBaskets > 0 ? (
-                <div key="summary-baskets-row" className="flex items-center justify-between lg:justify-start gap-4">
+                <div key="summary-baskets-row" className="flex flex-col sm:flex-row sm:items-center justify-between lg:justify-start gap-1 sm:gap-4">
                   <span className="text-slate-300">
                     🧺 <strong>{effectiveBaskets} Cesta(s)</strong> de ropa:
                   </span>
@@ -777,7 +777,7 @@ export default function BasketCalculator() {
 
               {/* Línea de Edredones */}
               {totalComfortersCount > 0 ? (
-                <div key="summary-comforters-row" className="flex items-center justify-between lg:justify-start gap-4">
+                <div key="summary-comforters-row" className="flex flex-col sm:flex-row sm:items-center justify-between lg:justify-start gap-1 sm:gap-4">
                   <span className="text-slate-300">
                     🛏️ <strong>{totalComfortersCount} Edredón(es)</strong>:
                   </span>
@@ -789,18 +789,18 @@ export default function BasketCalculator() {
 
               {/* Plan activo */}
               {effectiveBaskets > 0 ? (
-                <div key="summary-plan-name" className="text-[11px] text-cyan-200/90 pt-1">
+                <div key="summary-plan-name" className="text-[11px] text-cyan-200/90 pt-1 break-words">
                   Plan: <strong>{planTitleSummary}</strong>
                 </div>
               ) : null}
             </div>
 
             {/* Total General Grande */}
-            <div className="pt-2 border-t border-blue-800/80 flex items-baseline gap-3">
-              <div className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
-                ${totalUSD.toFixed(2)} <span className="text-lg font-bold text-cyan-300">USD</span>
+            <div className="pt-2 border-t border-blue-800/80 flex flex-wrap items-baseline gap-2 sm:gap-3">
+              <div className="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">
+                ${totalUSD.toFixed(2)} <span className="text-base sm:text-lg font-bold text-cyan-300">USD</span>
               </div>
-              <div className="text-sm font-bold text-slate-300">
+              <div className="text-xs sm:text-sm font-bold text-slate-300">
                 ≈ Bs. {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>

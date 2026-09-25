@@ -490,13 +490,13 @@ export default function EmployeeWorkStation() {
     <div className="space-y-6">
       
       {/* Top Banner de Personal LAV */}
-      <div className="rounded-3xl bg-gradient-to-r from-blue-900 via-blue-950 to-slate-900 p-6 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-blue-800">
+      <div className="rounded-3xl bg-gradient-to-r from-blue-900 via-blue-950 to-slate-900 p-4 sm:p-6 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-blue-800 w-full max-w-full overflow-hidden">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2 border border-cyan-500/30">
             <BookOpen size={14} className="text-cyan-400" />
             <span>Puesto de Trabajo · Personal LAV</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+          <h1 className="text-xl sm:text-3xl font-black tracking-tight">
             Gestión Diaria de Clientes y Caja
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 mt-1">
@@ -504,13 +504,13 @@ export default function EmployeeWorkStation() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <button
             onClick={() => {
               setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
               setShowAddModal(true);
             }}
-            className="px-5 py-3 rounded-2xl bg-blue-500 hover:bg-blue-400 text-white font-extrabold text-sm shadow-md transition-all flex items-center gap-2 active:scale-95"
+            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-blue-500 hover:bg-blue-400 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
           >
             <Plus size={18} />
             <span>Anotar Cliente en Mostrador</span>
@@ -520,7 +520,7 @@ export default function EmployeeWorkStation() {
 
       {/* BANNER DE AVISO: PEDIDOS RECIBIDOS DESDE LA APP WEB */}
       {pendingAppOrdersCount > 0 && (
-        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 text-white shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-blue-500/40 animate-in fade-in duration-200">
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 text-white shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-blue-500/40 animate-in fade-in duration-200 w-full max-w-full overflow-hidden">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 shadow-inner">
               <Smartphone size={22} className="text-cyan-200" />
@@ -539,7 +539,7 @@ export default function EmployeeWorkStation() {
               setActiveTab('daily_log');
               setOriginFilter('app');
             }}
-            className="px-4 py-2 rounded-xl bg-white text-blue-800 font-black text-xs uppercase shadow-sm hover:bg-blue-50 transition-all shrink-0 active:scale-95"
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-white text-blue-800 font-black text-xs uppercase shadow-sm hover:bg-blue-50 transition-all shrink-0 active:scale-95 text-center"
           >
             Ver Pedidos de la App ({pendingAppOrdersCount})
           </button>
@@ -547,53 +547,53 @@ export default function EmployeeWorkStation() {
       )}
 
       {/* Selector de Pestañas Principales */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-blue-200/80 pb-3">
+      <div className="flex items-center gap-1.5 sm:gap-2 border-b border-blue-200/80 pb-3 overflow-x-auto no-scrollbar sm:flex-wrap w-full max-w-full">
         <button
           onClick={() => setActiveTab('daily_log')}
-          className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-2 ${
+          className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 ${
             activeTab === 'daily_log'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'bg-white text-slate-700 hover:bg-blue-50 border border-slate-200'
           }`}
         >
-          <FileText size={16} />
+          <FileText size={15} />
           <span>📝 Cuaderno Diario ({recordsOfSelectedDate.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('stored_clothes')}
-          className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-2 ${
+          className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 ${
             activeTab === 'stored_clothes'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'bg-white text-slate-700 hover:bg-blue-50 border border-slate-200'
           }`}
         >
-          <Package size={16} />
-          <span>🧺 Ropa Dejada en Depósito ({storedClothesRecords.length})</span>
+          <Package size={15} />
+          <span>🧺 Depósito ({storedClothesRecords.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('detergents')}
-          className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-2 ${
+          className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 ${
             activeTab === 'detergents'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'bg-white text-slate-700 hover:bg-blue-50 border border-slate-200'
           }`}
         >
-          <Droplets size={16} />
-          <span>🧴 Control de Insumos ({detergentLogs.length})</span>
+          <Droplets size={15} />
+          <span>🧴 Insumos ({detergentLogs.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('closure')}
-          className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-2 ${
+          className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 ${
             activeTab === 'closure'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'bg-white text-slate-700 hover:bg-blue-50 border border-slate-200'
           }`}
         >
-          <DollarSign size={16} />
-          <span>📊 Cierre Diario de Caja</span>
+          <DollarSign size={15} />
+          <span>📊 Cierre de Caja</span>
         </button>
       </div>
 
@@ -610,10 +610,10 @@ export default function EmployeeWorkStation() {
           )}
 
           {/* BARRA DIRECTA DE CARGA EN MOSTRADOR */}
-          <div className="bg-white p-5 rounded-3xl border border-blue-200 shadow-md">
-            <div className="flex items-center justify-between gap-3 mb-3 border-b border-blue-50 pb-2">
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-blue-200 shadow-md w-full max-w-full overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 mb-3 border-b border-blue-50 pb-2">
               <div className="flex items-center gap-2">
-                <span className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black text-sm">
+                <span className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black text-sm shrink-0">
                   ⚡
                 </span>
                 <div>
@@ -633,7 +633,7 @@ export default function EmployeeWorkStation() {
                   setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
                   setShowAddModal(true);
                 }}
-                className="text-[11px] text-blue-600 hover:text-blue-800 font-extrabold flex items-center gap-1 hover:underline"
+                className="text-[11px] text-blue-600 hover:text-blue-800 font-extrabold flex items-center gap-1 hover:underline self-start sm:self-auto"
               >
                 <span>+ Abrir Formulario Detallado</span>
               </button>
@@ -875,9 +875,13 @@ export default function EmployeeWorkStation() {
           </div>
 
           {/* Tabla que replica el cuaderno físico */}
-          <div className="bg-white rounded-3xl border border-blue-200/80 shadow-md overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+          <div className="bg-white rounded-3xl border border-blue-200/80 shadow-md overflow-hidden w-full max-w-full">
+            <div className="sm:hidden px-3.5 py-2 bg-blue-50 text-[11px] text-blue-700 font-bold flex items-center justify-between border-b border-blue-100">
+              <span>👈 Desliza horizontalmente la tabla 👉</span>
+              <span>{filteredByOrigin.length} filas</span>
+            </div>
+            <div className="overflow-x-auto w-full max-w-full">
+              <table className="w-full text-left text-xs min-w-[720px]">
                 <thead className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-extrabold uppercase tracking-wider">
                   <tr>
                     <th className="py-3 px-3">Hora</th>

@@ -110,76 +110,81 @@ export default function App() {
       <div className="min-h-screen bg-[#EEF5FB] text-slate-900 flex flex-col justify-between selection:bg-blue-500 selection:text-white">
         
         {/* Top Slogan Banner */}
-        <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 text-white py-2 px-4 text-center text-xs sm:text-sm font-black tracking-wide shadow-xs flex items-center justify-center gap-2">
-          <Sparkles size={15} className="text-amber-300 shrink-0" />
-          <span>El mejor servicio al mejor precio es nuestra mayor prioridad</span>
-          <Sparkles size={15} className="text-amber-300 shrink-0 hidden sm:inline" />
+        <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 text-white py-2 px-3 text-center text-xs sm:text-sm font-black tracking-wide shadow-xs flex items-center justify-center gap-1.5 leading-tight">
+          <Sparkles size={14} className="text-amber-300 shrink-0" />
+          <span className="break-words">El mejor servicio al mejor precio es nuestra mayor prioridad</span>
+          <Sparkles size={14} className="text-amber-300 shrink-0 hidden sm:inline" />
         </div>
 
         {/* Top Navbar */}
-        <header className="sticky top-0 z-40 border-b border-blue-200/70 bg-white/90 backdrop-blur-md shadow-xs">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        <header className="sticky top-0 z-40 border-b border-blue-200/70 bg-white/95 backdrop-blur-md shadow-xs">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-0 sm:h-20 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-4">
             {/* Logo */}
             <div 
               onClick={() => setCurrentView('client')}
-              className="flex items-center gap-3 cursor-pointer group"
+              className="flex items-center gap-2.5 cursor-pointer group w-full sm:w-auto justify-between sm:justify-start"
             >
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center text-white font-black text-xl shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-                AJ
-              </div>
-              <div>
-                <span className="text-xl font-black tracking-tight text-slate-900 block leading-none">
-                  LAVANDERÍA <span className="text-blue-600">AJ</span>
-                </span>
-                <span className="text-[10px] font-mono tracking-widest text-slate-500 uppercase font-semibold">
-                  Sistema & PWA Oficial
-                </span>
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform shrink-0">
+                  AJ
+                </div>
+                <div>
+                  <span className="text-lg sm:text-xl font-black tracking-tight text-slate-900 block leading-none">
+                    LAVANDERÍA <span className="text-blue-600">AJ</span>
+                  </span>
+                  <span className="text-[10px] font-mono tracking-widest text-slate-500 uppercase font-semibold">
+                    Sistema & PWA Oficial
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-2">
+            <nav className="flex items-center justify-center gap-1.5 sm:gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar py-0.5">
               <button
                 onClick={() => setCurrentView('client')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 ${
                   currentView === 'client'
                     ? 'bg-blue-600 text-white shadow-sm font-extrabold'
                     : 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70'
                 }`}
               >
-                <Globe size={14} /> Portal Clientes
+                <Globe size={14} className="shrink-0" />
+                <span>Portal Clientes</span>
               </button>
 
               <button
                 onClick={handleEmployeeAccess}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 ${
                   currentView === 'employee'
                     ? 'bg-blue-600 text-white shadow-sm font-extrabold'
                     : 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70'
                 }`}
               >
-                <BookOpen size={14} /> Personal LAV
+                <BookOpen size={14} className="shrink-0" />
+                <span>Personal LAV</span>
               </button>
 
               <button
                 onClick={() => handleAdminAccess('admin_accounting')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 ${
                   currentView.startsWith('admin')
                     ? 'bg-slate-900 text-white shadow-sm font-extrabold'
                     : 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70'
                 }`}
               >
-                <DollarSign size={14} /> Panel Administrador
+                <DollarSign size={14} className="shrink-0" />
+                <span>Admin</span>
               </button>
-            </div>
+            </nav>
           </div>
 
           {/* Sub-menu if admin is active */}
           {currentView.startsWith('admin') && (
-            <div className="border-t border-blue-100 bg-blue-50/80 px-4 py-2 flex justify-center gap-2 overflow-x-auto">
+            <div className="border-t border-blue-100 bg-blue-50/80 px-3 py-2 flex justify-start sm:justify-center gap-2 overflow-x-auto no-scrollbar">
               <button
                 onClick={() => setCurrentView('admin_accounting')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shrink-0 ${
                   currentView === 'admin_accounting' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -187,7 +192,7 @@ export default function App() {
               </button>
               <button
                 onClick={() => setCurrentView('admin_machines')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shrink-0 ${
                   currentView === 'admin_machines' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -195,7 +200,7 @@ export default function App() {
               </button>
               <button
                 onClick={() => setCurrentView('admin_crm')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shrink-0 ${
                   currentView === 'admin_crm' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -206,7 +211,7 @@ export default function App() {
         </header>
 
         {/* Main Content Area */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 w-full max-w-full overflow-hidden">
           <ErrorBoundary>
             {currentView === 'client' && (
               <>
