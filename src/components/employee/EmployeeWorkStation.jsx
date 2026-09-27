@@ -1002,16 +1002,59 @@ export default function EmployeeWorkStation() {
                           </div>
                         </td>
 
-                        {/* Estado de Entrega */}
+                        {/* Estado de Entrega Interactivo */}
                         <td className="py-3 px-3 whitespace-nowrap">
                           {rec.deliveryStatus === 'delivered' ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-700 font-bold text-xs">
-                              <CheckCircle2 size={14} /> Entregado
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl font-bold text-xs shadow-xs">
+                                <CheckCircle2 size={13} className="text-emerald-600" /> Entregado
+                              </span>
+                              <button
+                                type="button"
+                                title="Desmarcar entrega (devolver a almacén si fue un error)"
+                                onClick={() => {
+                                  if (window.confirm(`¿Deseas devolver la ropa de "${rec.customerName}" a En Almacén?`)) {
+                                    updateDailyRecord(rec.id, { deliveryStatus: 'in_store', deliveredDate: null });
+                                  }
+                                }}
+                                className="text-[10px] text-slate-400 hover:text-slate-600 underline"
+                              >
+                                Deshacer
+                              </button>
+                            </div>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-amber-600 font-bold text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              <Package size={14} /> En Almacén
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {rec.debtUSD > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRecordToPay(rec);
+                                    setPayMethodSelect('usd_cash');
+                                    setPayRefInput('');
+                                    setPayModalOpen(true);
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] shadow-xs transition-all flex items-center gap-1 active:scale-95"
+                                  title="Cobrar deuda pendiente y entregar ropa"
+                                >
+                                  <DollarSign size={13} />
+                                  <span>Cobrar y Entregar</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    markRecordDelivered(rec.id);
+                                    setInlineSuccessToast(`✅ ¡Ropa de "${rec.customerName}" marcada como entregada!`);
+                                    setTimeout(() => setInlineSuccessToast(''), 3500);
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[11px] shadow-xs transition-all flex items-center gap-1 active:scale-95"
+                                  title="Marcar ropa como entregada al cliente"
+                                >
+                                  <Check size={13} />
+                                  <span>Marcar Entregado</span>
+                                </button>
+                              )}
+                            </div>
                           )}
                         </td>
 

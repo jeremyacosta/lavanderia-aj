@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Users, Phone, MessageSquare, Plus, Search, Calendar, Star, Tag } from 'lucide-react';
 
 export default function CustomerCRM() {
-  const { customers, orders } = useApp();
+  const { customers, orders, dailyRecords } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredCustomers = customers.filter(c => 
@@ -49,8 +49,10 @@ export default function CustomerCRM() {
       {/* Customer Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {filteredCustomers.map((cust) => {
-          const customerOrders = orders.filter(o => o.customerPhone === cust.phone);
-          const totalSpentUSD = customerOrders.reduce((acc, o) => acc + o.totalUSD, 0);
+          const custDaily = (dailyRecords || []).filter(r => r.customerPhone === cust.phone || (cust.name && r.customerName.toLowerCase() === cust.name.toLowerCase()));
+          const custOrders = (orders || []).filter(o => o.customerPhone === cust.phone && !custDaily.some(d => d.id === o.originalId || o.id === `AJ-${d.id.replace('rec_', '')}`));
+          const totalSpentUSD = [...custDaily, ...custOrders].reduce((acc, o) => acc + (o.totalUSD || 0), 0);
+          const totalServicesCount = custDaily.length + custOrders.length;
 
           return (
             <div

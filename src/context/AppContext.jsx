@@ -467,15 +467,32 @@ export function AppProvider({ children }) {
   };
 
   const updateOrderStatus = (orderId, newStatus) => {
-    setOrders(orders.map(o => o.id === orderId ? { ...o, orderStatus: newStatus } : o));
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, orderStatus: newStatus } : o));
+    // Sincronizar también en el cuaderno diario si corresponde
+    const recId = orderId.startsWith('AJ-') ? `rec_${orderId.slice(3)}` : orderId;
+    const isDelivered = newStatus === 'delivered';
+    setDailyRecords(prev => prev.map(r => (r.id === orderId || r.id === recId) ? {
+      ...r,
+      deliveryStatus: isDelivered ? 'delivered' : r.deliveryStatus,
+      deliveredDate: isDelivered ? new Date().toISOString().split('T')[0] : r.deliveredDate
+    } : r));
   };
 
   const updatePaymentStatus = (orderId, newPaymentStatus, method) => {
-    setOrders(orders.map(o => o.id === orderId ? { 
+    setOrders(prev => prev.map(o => o.id === orderId ? { 
       ...o, 
       paymentStatus: newPaymentStatus,
       paymentMethod: method || o.paymentMethod 
     } : o));
+    // Sincronizar también en el cuaderno diario si corresponde
+    const recId = orderId.startsWith('AJ-') ? `rec_${orderId.slice(3)}` : orderId;
+    setDailyRecords(prev => prev.map(r => (r.id === orderId || r.id === recId) ? {
+      ...r,
+      paymentStatus: newPaymentStatus,
+      paymentMethod: method || r.paymentMethod,
+      debtUSD: newPaymentStatus === 'paid' ? 0 : r.debtUSD,
+      amountPaidUSD: newPaymentStatus === 'paid' ? r.totalUSD : r.amountPaidUSD
+    } : r));
   };
 
   const addExpense = (expense) => {
@@ -526,7 +543,33 @@ export function AppProvider({ children }) {
       time: newRecord.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       deliveryStatus: newRecord.deliveryStatus || 'in_store'
     };
-    setDailyRecords([record, ...dailyRecords]);
+    setDailyRecords(prev => [record, ...prev]);
+
+    // Sincronizar automáticamente en la colección de Órdenes para que aparezca en Administración y Contabilidad
+    const isPaid = newRecord.paymentStatus === 'paid';
+    const isDelivered = newRecord.deliveryStatus === 'delivered';
+    const orderFormat = {
+      id: `AJ-${nextId.slice(4)}`,
+      originalId: nextId,
+      customerName: newRecord.customerName,
+      customerPhone: newRecord.customerPhone || 'En mostrador',
+      date: record.date,
+      time: record.time,
+      itemsSummary: newRecord.notes || `${newRecord.washCount || 1} Cesta(s) (${newRecord.washCount || 1} lav, ${newRecord.dryCount || 0} sec)`,
+      totalUSD: newRecord.totalUSD || 0,
+      totalBs: newRecord.totalBs || 0,
+      amountPaidUSD: newRecord.amountPaidUSD !== undefined ? newRecord.amountPaidUSD : (isPaid ? newRecord.totalUSD : 0),
+      amountPaidBs: newRecord.amountPaidBs !== undefined ? newRecord.amountPaidBs : (isPaid ? newRecord.totalBs : 0),
+      debtUSD: newRecord.debtUSD !== undefined ? newRecord.debtUSD : (isPaid ? 0 : newRecord.totalUSD),
+      paymentStatus: newRecord.paymentStatus || 'pending',
+      paymentMethod: newRecord.paymentMethod || 'pago_movil',
+      orderStatus: isDelivered ? 'delivered' : 'ready',
+      deliveryStatus: newRecord.deliveryStatus || 'in_store',
+      origin: newRecord.origin || 'walk_in',
+      bankReference: newRecord.bankReference || '',
+      notes: newRecord.notes || ''
+    };
+    setOrders(prev => [orderFormat, ...prev]);
 
     // Si se incluye teléfono o nombre, sincronizar con clientes
     if (newRecord.customerPhone) {
@@ -539,7 +582,7 @@ export function AppProvider({ children }) {
           name: newRecord.customerName,
           phone: newRecord.customerPhone,
           visits: 1,
-          notes: 'Registrado desde el cuaderno diario'
+          notes: 'Registrado desde el mostrador / cuaderno'
         }, ...customers]);
       }
     }
@@ -548,19 +591,40 @@ export function AppProvider({ children }) {
   };
 
   const updateDailyRecord = (id, updatedFields) => {
-    setDailyRecords(dailyRecords.map(r => r.id === id ? { ...r, ...updatedFields } : r));
+    setDailyRecords(prev => prev.map(r => r.id === id ? { ...r, ...updatedFields } : r));
+
+    // Sincronizar en órdenes
+    setOrders(prev => prev.map(o => {
+      if (o.id === id || o.originalId === id || o.id === `AJ-${id.replace('rec_', '')}`) {
+        return {
+          ...o,
+          ...updatedFields,
+          orderStatus: updatedFields.deliveryStatus === 'delivered' ? 'delivered' : o.orderStatus
+        };
+      }
+      return o;
+    }));
   };
 
   const markRecordDelivered = (id) => {
-    setDailyRecords(dailyRecords.map(r => r.id === id ? { 
+    const today = new Date().toISOString().split('T')[0];
+    setDailyRecords(prev => prev.map(r => r.id === id ? { 
       ...r, 
       deliveryStatus: 'delivered',
-      deliveredDate: new Date().toISOString().split('T')[0]
+      deliveredDate: today
     } : r));
+
+    // Sincronizar en órdenes para que Administración lo vea entregado
+    setOrders(prev => prev.map(o => (o.id === id || o.originalId === id || o.id === `AJ-${id.replace('rec_', '')}`) ? {
+      ...o,
+      orderStatus: 'delivered',
+      deliveryStatus: 'delivered',
+      deliveredDate: today
+    } : o));
   };
 
   const markRecordPaid = (id, paymentData = {}) => {
-    setDailyRecords(dailyRecords.map(r => {
+    setDailyRecords(prev => prev.map(r => {
       if (r.id === id) {
         return {
           ...r,
@@ -575,6 +639,13 @@ export function AppProvider({ children }) {
       }
       return r;
     }));
+
+    // Sincronizar en órdenes para que Administración registre el pago
+    setOrders(prev => prev.map(o => (o.id === id || o.originalId === id || o.id === `AJ-${id.replace('rec_', '')}`) ? {
+      ...o,
+      paymentStatus: 'paid',
+      paymentMethod: paymentData.paymentMethod || o.paymentMethod || 'usd_cash'
+    } : o));
   };
 
   // Verificación de Contraseña Administrativa
@@ -618,8 +689,9 @@ export function AppProvider({ children }) {
       }
     };
 
-    setAuditLogs([auditEntry, ...auditLogs]);
-    setDailyRecords(dailyRecords.filter(r => r.id !== id));
+    setAuditLogs(prev => [auditEntry, ...prev]);
+    setDailyRecords(prev => prev.filter(r => r.id !== id));
+    setOrders(prev => prev.filter(o => o.id !== id && o.originalId !== id && o.id !== `AJ-${id.replace('rec_', '')}`));
 
     return { success: true, message: 'Registro eliminado y registrado en la bitácora de auditoría del administrador.' };
   };

@@ -27,8 +27,55 @@ export default function AccountingDashboard() {
 
   const todayStr = new Date().toISOString().split('T')[0];
 
+  // Unificación integral: reúne los servicios cargados desde Mostrador, Cuaderno Diario, App y Tickets
+  const allOrders = React.useMemo(() => {
+    const list = new Map();
+
+    // 1. Mapear todos los dailyRecords (donde se cargan los servicios de mostrador y cuaderno)
+    (dailyRecords || []).forEach(r => {
+      const isPaid = r.paymentStatus === 'paid';
+      const isDelivered = r.deliveryStatus === 'delivered';
+      const orderId = r.id.startsWith('rec_') ? `AJ-${r.id.slice(4)}` : r.id;
+      list.set(r.id, {
+        id: orderId,
+        recordId: r.id,
+        customerName: r.customerName,
+        customerPhone: r.customerPhone || 'En mostrador',
+        date: r.date,
+        time: r.time,
+        itemsSummary: r.notes || `${r.washCount || 1} Cesta(s) (${r.washCount || 1} lav, ${r.dryCount || 0} sec)`,
+        totalUSD: r.totalUSD || 0,
+        totalBs: r.totalBs || 0,
+        amountPaidUSD: r.amountPaidUSD !== undefined ? r.amountPaidUSD : (isPaid ? r.totalUSD : 0),
+        amountPaidBs: r.amountPaidBs !== undefined ? r.amountPaidBs : (isPaid ? r.totalBs : 0),
+        debtUSD: r.debtUSD !== undefined ? r.debtUSD : (isPaid ? 0 : r.totalUSD),
+        paymentStatus: r.paymentStatus || 'pending',
+        paymentMethod: r.paymentMethod || 'pago_movil',
+        orderStatus: isDelivered ? 'delivered' : 'ready',
+        deliveryStatus: r.deliveryStatus || 'in_store',
+        origin: r.origin || 'counter',
+        bankReference: r.bankReference || '',
+        notes: r.notes || ''
+      });
+    });
+
+    // 2. Mapear orders adicionales si no coinciden por id
+    (orders || []).forEach(o => {
+      const key = o.originalId || o.id;
+      if (!list.has(key) && !list.has(o.id) && !list.has(`rec_${o.id.replace('AJ-', '')}`)) {
+        list.set(o.id, o);
+      }
+    });
+
+    return Array.from(list.values()).sort((a, b) => {
+      const da = (a.date || '') + ' ' + (a.time || '');
+      const db = (b.date || '') + ' ' + (b.time || '');
+      return db.localeCompare(da);
+    });
+  }, [dailyRecords, orders]);
+
   // Filtrado
-  const filteredOrders = filterPeriod === 'today' ? orders.filter(o => o.date === todayStr) : orders;
+  const filteredOrders = filterPeriod === 'today' ? allOrders.filter(o => o.date === todayStr) : allOrders;
   const filteredExpenses = filterPeriod === 'today' ? expenses.filter(e => e.date === todayStr) : expenses;
 
   // Métricas Financieras
@@ -366,8 +413,20 @@ export default function AccountingDashboard() {
                           #{order.id}
                         </td>
                         <td className="py-3 px-4">
-                          <div className="font-bold text-slate-900">{order.customerName}</div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-slate-900">{order.customerName}</span>
+                            {order.origin === 'walk_in' || order.origin === 'counter' ? (
+                              <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-bold border border-slate-200">
+                                🏢 Mostrador
+                              </span>
+                            ) : order.origin === 'app' ? (
+                              <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-black border border-blue-200">
+                                📱 App
+                              </span>
+                            ) : null}
+                          </div>
                           <div className="text-[11px] text-slate-400 font-mono">{order.customerPhone}</div>
+                          {order.notes && <div className="text-[10px] text-amber-700 italic max-w-xs truncate">{order.notes}</div>}
                         </td>
                         <td className="py-3 px-4 text-slate-700 font-medium">
                           {order.itemsSummary}
