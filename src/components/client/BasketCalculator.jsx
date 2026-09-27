@@ -47,7 +47,7 @@ export default function BasketCalculator() {
   const [customDegreaser, setCustomDegreaser] = useState(false); // $0.50
   const [customLabor, setCustomLabor] = useState(true);        // $0.20
 
-  // Cálculos de prendas y capacidad
+  // Cálculos de prendas y capacidad con tolerancia de sobrepeso
   const totalClothesCount = pants + shirts + towels + mixedClothes;
 
   const totalWeightApprox = 
@@ -56,25 +56,40 @@ export default function BasketCalculator() {
     (towels * 1.6) + 
     (mixedClothes * 0.375);
 
-  const BASKET_CAPACITY_KG = 6.0;
+  const BASKET_STANDARD_KG = 6.0;
+  const OVERWEIGHT_TOLERANCE_KG = 1.2;
 
+  // Si no hay prendas: 0 cestas.
+  // 1 cesta estándar = 6.0 kg, pero se permite hasta 1.2 kg adicional de sobrepeso (hasta 7.2 kg).
+  // Si pasa de 7.2 kg, salta automáticamente a 2 cestas (12.0 kg base + 1.2 kg = 13.2 kg), etc.
   const calculatedBaskets = totalClothesCount > 0 
-    ? Math.max(1, Math.ceil(totalWeightApprox / BASKET_CAPACITY_KG)) 
+    ? Math.max(1, Math.ceil((totalWeightApprox - OVERWEIGHT_TOLERANCE_KG) / BASKET_STANDARD_KG)) 
     : 0;
 
   const effectiveBaskets = useDirectBaskets 
     ? directBaskets 
     : calculatedBaskets;
 
-  const weightInCurrentBasket = totalWeightApprox > 0
-    ? (totalWeightApprox % BASKET_CAPACITY_KG === 0 ? BASKET_CAPACITY_KG : (totalWeightApprox % BASKET_CAPACITY_KG))
-    : 0;
+  // Límites para la cantidad de cestas calculadas
+  const standardLimitKg = calculatedBaskets * BASKET_STANDARD_KG; // ej: 6.0 kg para 1 cesta
+  const maxAllowedKg = standardLimitKg + OVERWEIGHT_TOLERANCE_KG; // ej: 7.2 kg para 1 cesta
 
+  // Condición de Sobrepeso (supera el estándar pero está dentro de los 1.2 kg adicionales permitidos)
+  const isOverweight = !useDirectBaskets && totalWeightApprox > standardLimitKg && totalWeightApprox <= maxAllowedKg;
+
+  // Kilos de sobrepeso
+  const overweightKg = Math.max(0, totalWeightApprox - standardLimitKg);
+
+  // Margen de sobrepeso restante antes de pasar a la siguiente cesta
+  const remainingOverweightMargin = Math.max(0, OVERWEIGHT_TOLERANCE_KG - overweightKg);
+
+  // Kilos faltantes para llenar el estándar
+  const remainingStandardKg = Math.max(0, standardLimitKg - totalWeightApprox);
+
+  // Porcentaje para la barra de llenado
   const basketPercentFilled = totalClothesCount > 0 
-    ? Math.min(100, Math.round((weightInCurrentBasket / BASKET_CAPACITY_KG) * 100))
+    ? Math.min(100, Math.round((totalWeightApprox / standardLimitKg) * 100))
     : 0;
-
-  const remainingKgInBasket = Math.max(0, BASKET_CAPACITY_KG - weightInCurrentBasket);
 
   // Precio unitario por cesta según combo y productos adicionales
   let basketUnitPrice = 0;
@@ -167,7 +182,7 @@ export default function BasketCalculator() {
     lines.push('');
     
     if (useDirectBaskets) {
-      lines.push(`• Cestas directas: *${directBaskets} cesta(s)*`);
+      lines.push(`• Cestas seleccionadas: *${directBaskets} cesta(s) directa(s)* (Sin detallar prendas - Sujeto a confirmación y pesaje físico por el personal)`);
     } else if (totalClothesCount > 0) {
       lines.push('👕 *Prendas ingresadas:*');
       if (pants > 0) lines.push(`  - Pantalones: ${pants}`);
@@ -175,6 +190,9 @@ export default function BasketCalculator() {
       if (towels > 0) lines.push(`  - Toallas: ${towels}`);
       if (mixedClothes > 0) lines.push(`  - Ropa Variada: ${mixedClothes}`);
       lines.push(`  ↳ Total ropa: *${effectiveBaskets} cesta(s)* (~${totalWeightApprox.toFixed(1)} kg)`);
+      if (isOverweight) {
+        lines.push(`  ⚠️ *Nota de sobrepeso:* +${overweightKg.toFixed(1)} kg extra (aprovechando margen permitido de 1.2 kg)`);
+      }
     }
 
     if (effectiveBaskets > 0) {
@@ -196,7 +214,7 @@ export default function BasketCalculator() {
     lines.push('');
     lines.push(`💰 *TOTAL ESTIMADO:* *$${totalUSD.toFixed(2)} USD* (+ IVA) (~Bs. ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + IVA)`);
     lines.push('');
-    lines.push('⚠️ *Nota importante:* Entiendo que este monto es un presupuesto estimado y estará sujeto a ajustes por el operario al momento de recibir la ropa en el local.');
+    lines.push('⚠️ *Nota importante:* Entiendo que este monto es un presupuesto estimado y estará sujeto a pesaje y verificación por el personal al momento de recibir la ropa en el local.');
     lines.push('');
     lines.push('¿Tienen disponibilidad para recibirme hoy? ¡Muchas gracias!');
 
@@ -231,7 +249,7 @@ export default function BasketCalculator() {
       deliveryStatus: 'in_store',
       origin: 'app',
       intakeStatus: 'pending_intake',
-      notes: `📲 Pedido desde la App: ${useDirectBaskets ? `${directBaskets} cestas` : `${totalClothesCount} prendas (~${effectiveBaskets} cestas)`}${totalComfortersCount > 0 ? ` + ${totalComfortersCount} edredón(es)` : ''} · ${planTitleSummary}`
+      notes: `📲 Pedido desde la App: ${useDirectBaskets ? `${directBaskets} cestas directas (Sin especificar prendas - Por verificar y pesar en físico por el personal)` : `${totalClothesCount} prendas (~${effectiveBaskets} cestas, ${totalWeightApprox.toFixed(1)} kg${isOverweight ? ` - Sobrepeso +${overweightKg.toFixed(1)} kg` : ''})`}${totalComfortersCount > 0 ? ` + ${totalComfortersCount} edredón(es)` : ''} · ${planTitleSummary}`
     });
 
     setSentOrderDetails({
@@ -291,38 +309,128 @@ export default function BasketCalculator() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold shrink-0">1</span>
-            <span>{useDirectBaskets ? 'Indica tus Cestas de Ropa:' : 'Ingresa la Cantidad de tus Prendas:'}</span>
+            <span>{useDirectBaskets ? 'Indica tus Cestas de Ropa Directas:' : 'Ingresa tus Prendas o Elige por Cestas:'}</span>
           </h3>
           <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 w-fit">
-            1 Cesta = 5 a 7 kg en seco (~6 kg promedio)
+            1 Cesta = 5 a 7 kg en seco (~6 kg base • Tolera hasta +1.2 kg)
           </span>
         </div>
 
-        {useDirectBaskets ? (
-          <div key="direct-baskets-box" className="p-6 rounded-2xl bg-blue-50/50 border border-blue-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <p className="font-bold text-slate-900 text-sm">¿Cuántas cestas completas vas a lavar?</p>
-              <p className="text-xs text-slate-500">Capacidad estándar de 5 a 7 kilos en seco por cesta.</p>
+        {/* BOTÓN Y PANEL SUPERIOR: SELECCIONAR CANTIDAD DE CESTAS DIRECTAMENTE (SIN ESPECIFICAR PRENDAS) */}
+        <div className={`mb-5 p-4 sm:p-5 rounded-2xl border-2 transition-all shadow-xs ${
+          useDirectBaskets 
+            ? 'bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 border-blue-400 ring-2 ring-blue-500/10' 
+            : 'bg-slate-50/80 border-slate-200 hover:border-blue-300'
+        }`}>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-2xl">🧺</span>
+                <h4 className="font-black text-slate-900 text-sm sm:text-base">
+                  ¿Prefieres no contar las prendas? Pide directamente por cantidad de cestas
+                </h4>
+                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                  useDirectBaskets ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {useDirectBaskets ? 'Modo Directo Activo' : 'Opción Rápida'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+                Elige aquí la cantidad de cestas deseadas sin especificar prendas. <strong>Siempre serán pesadas y confirmadas en físico por el personal de Lavandería AJ</strong> en recepción para concretar tu pedido en la aplicación.
+              </p>
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Botón principal de alternancia / activación directa */}
+            <div className="flex flex-wrap items-center gap-2 self-start md:self-auto shrink-0">
               <button
-                onClick={() => setDirectBaskets(Math.max(1, directBaskets - 1))}
-                className="w-11 h-11 rounded-xl bg-white border border-blue-200 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold shadow-sm active:scale-95"
+                type="button"
+                onClick={() => setUseDirectBaskets(!useDirectBaskets)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 border shadow-xs active:scale-95 ${
+                  useDirectBaskets
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-blue-500/20'
+                    : 'bg-white text-blue-700 border-blue-300 hover:bg-blue-50'
+                }`}
               >
-                <Minus size={18} />
-              </button>
-              <span className="w-14 text-center text-3xl font-black text-blue-900 font-mono">
-                {directBaskets}
-              </span>
-              <button
-                onClick={() => setDirectBaskets(directBaskets + 1)}
-                className="w-11 h-11 rounded-xl bg-white border border-blue-200 text-slate-700 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center font-bold shadow-sm active:scale-95"
-              >
-                <Plus size={18} />
+                <span className="text-sm">🧺</span>
+                <span>{useDirectBaskets ? 'Usando Cestas Directas' : 'Seleccionar Cestas Directas'}</span>
               </button>
             </div>
           </div>
-        ) : (
+
+          {/* Selector de cantidad y píldoras rápidas */}
+          {useDirectBaskets ? (
+            <div className="mt-4 pt-3.5 border-t border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-150">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-slate-700">Cantidad de cestas:</span>
+                <div className="flex items-center gap-2 bg-white rounded-xl p-1 border border-blue-300 shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => setDirectBaskets(Math.max(1, directBaskets - 1))}
+                    className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-800 flex items-center justify-center font-bold transition-colors active:scale-95"
+                    title="Menos cestas"
+                  >
+                    <Minus size={16} />
+                  </button>
+                  <span className="w-12 text-center text-2xl font-black text-blue-900 font-mono select-none">
+                    {directBaskets}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDirectBaskets(directBaskets + 1)}
+                    className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-800 flex items-center justify-center font-bold transition-colors active:scale-95"
+                    title="Más cestas"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+                <span className="text-xs font-semibold text-blue-900">
+                  = <strong>{directBaskets} {directBaskets === 1 ? 'cesta' : 'cestas'}</strong> (~{directBaskets * 6} kg)
+                </span>
+              </div>
+
+              {/* Píldoras de selección rápida */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-bold text-slate-500">Rápido:</span>
+                {[1, 2, 3, 4, 5, 6].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setDirectBaskets(num)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      directBaskets === num
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-white text-slate-700 hover:bg-blue-100 border border-slate-200'
+                    }`}
+                  >
+                    {num} {num === 1 ? 'cesta' : 'cestas'}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setUseDirectBaskets(false)}
+                  className="ml-auto text-[11px] font-bold text-blue-700 hover:underline flex items-center gap-1"
+                >
+                  <span>Contar por prendas</span>
+                  <ArrowRight size={12} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 text-[11px] text-slate-500 flex items-center justify-between">
+              <span>👇 O usa los botones de abajo para simular tu cesta prenda por prenda según peso estimado:</span>
+              <button 
+                type="button" 
+                onClick={() => setUseDirectBaskets(true)}
+                className="text-blue-700 font-bold hover:underline hidden sm:inline"
+              >
+                Activar modo por cestas directas →
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Sección de Prendas (visible en modo prendas o para afinar cálculo) */}
+        {!useDirectBaskets && (
           <div key="clothes-garments-box">
             {/* Grid de prendas ordinarias */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -481,12 +589,21 @@ export default function BasketCalculator() {
               </div>
             </div>
 
-            {/* BARRA DE CAPACIDAD Y LLENADO EN VIVO */}
+            {/* BARRA DE CAPACIDAD Y LLENADO EN VIVO CON DETECCIÓN DE SOBREPESO */}
             {totalClothesCount > 0 ? (
-              <div key="basket-progress-bar" className="mt-4 p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-2">
+              <div 
+                key="basket-progress-bar" 
+                className={`mt-4 p-4 rounded-2xl border-2 transition-all space-y-3 ${
+                  isOverweight 
+                    ? 'bg-red-50/95 border-red-500 shadow-md shadow-red-500/10 ring-2 ring-red-400/20' 
+                    : 'bg-blue-50/70 border-blue-200'
+                }`}
+              >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[11px] shrink-0">
+                    <span className={`w-6 h-6 rounded-full text-white font-bold flex items-center justify-center text-[11px] shrink-0 shadow-xs ${
+                      isOverweight ? 'bg-red-600' : 'bg-blue-600'
+                    }`}>
                       {effectiveBaskets}
                     </span>
                     <span className="font-extrabold text-slate-900 text-sm">
@@ -496,31 +613,73 @@ export default function BasketCalculator() {
                       ({totalClothesCount} prendas • ~{totalWeightApprox.toFixed(1)} kg)
                     </span>
                   </div>
-                  <div className="text-blue-800 font-bold">
-                    Cesta #{effectiveBaskets}: {basketPercentFilled}% ocupada
+
+                  <div className="flex items-center gap-2">
+                    {isOverweight ? (
+                      <span className="px-3 py-1 rounded-full bg-red-600 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm animate-pulse">
+                        <AlertTriangle size={14} className="text-white shrink-0" />
+                        <span>SOBREPESO (+{overweightKg.toFixed(1)} kg)</span>
+                      </span>
+                    ) : (
+                      <div className="text-blue-800 font-bold">
+                        Cesta #{effectiveBaskets}: {basketPercentFilled}% ocupada
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Progress bar visual */}
-                <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden p-0.5">
+                {/* Visual de la barra de progreso */}
+                <div className={`w-full h-3.5 rounded-full overflow-hidden p-0.5 border ${
+                  isOverweight ? 'bg-red-100 border-red-300' : 'bg-slate-200 border-slate-300'
+                }`}>
                   <div 
                     className={`h-full rounded-full transition-all duration-300 ${
-                      basketPercentFilled >= 90 ? 'bg-amber-500' : 'bg-blue-600'
+                      isOverweight 
+                        ? 'bg-gradient-to-r from-red-600 via-rose-500 to-red-600 shadow-sm shadow-red-500/50' 
+                        : basketPercentFilled >= 90 ? 'bg-amber-500' : 'bg-blue-600'
                     }`}
-                    style={{ width: `${basketPercentFilled}%` }}
+                    style={{ width: `${isOverweight ? 100 : basketPercentFilled}%` }}
                   />
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-600">
-                  <span>
-                    💡 Capacidad de cesta: Se cobra por cesta de 5 a 7 kg.
-                  </span>
-                  {remainingKgInBasket > 0 ? (
-                    <span className="text-emerald-700 font-bold">
-                      ¡Puedes meter ~{remainingKgInBasket.toFixed(1)} kg más en esta cesta sin pagar extra!
+                {/* ALERTA Y EXPLICACIÓN DE SOBREPESO O CAPACIDAD ESTÁNDAR */}
+                {isOverweight ? (
+                  <div className="p-3 rounded-xl bg-white border border-red-200 text-xs space-y-1.5 shadow-xs">
+                    <div className="font-extrabold flex items-center gap-1.5 text-red-700">
+                      <AlertTriangle size={16} className="text-red-600 shrink-0" />
+                      <span>¡Sobrepeso en la Cesta #{effectiveBaskets}!</span>
+                    </div>
+                    <p className="text-[12px] text-slate-700 leading-snug">
+                      Has superado el límite estándar de <strong>{standardLimitKg.toFixed(1)} kg</strong>. Puedes usar <strong>hasta 1.2 kg adicional</strong> de sobrepeso en esta misma cesta sin pagar una cesta adicional.
+                    </p>
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-red-100 text-[11px]">
+                      <span className="text-red-700 font-bold">
+                        ⚠️ Llevas: +{overweightKg.toFixed(1)} kg extra ({totalWeightApprox.toFixed(1)} kg de {maxAllowedKg.toFixed(1)} kg máx).
+                      </span>
+                      <span className="text-emerald-700 font-black bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        Margen adicional disponible: ~{remainingOverweightMargin.toFixed(1)} kg
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 italic">
+                      * Si pasas de {maxAllowedKg.toFixed(1)} kg (+1.2 kg de tolerancia), el sistema sumará automáticamente una {calculatedBaskets + 1}da cesta.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-600">
+                    <span>
+                      💡 Límite estándar: <strong>{standardLimitKg.toFixed(1)} kg</strong> (permite hasta <strong>+1.2 kg adicional</strong> de sobrepeso antes de saltar a {effectiveBaskets + 1} cestas).
                     </span>
-                  ) : null}
-                </div>
+                    {remainingStandardKg > 0 ? (
+                      <span className="text-emerald-700 font-bold">
+                        ¡Puedes meter ~{remainingStandardKg.toFixed(1)} kg más en esta cesta sin pagar extra!
+                      </span>
+                    ) : (
+                      <span className="text-blue-700 font-bold">
+                        Límite estándar alcanzado. Cuentas con hasta 1.2 kg adicional de tolerancia.
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div key="basket-empty-tip" className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs flex items-center gap-2">
