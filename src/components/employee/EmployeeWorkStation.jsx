@@ -250,6 +250,22 @@ export default function EmployeeWorkStation() {
     window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
   };
 
+  // Recalcular monto en la barra rápida manteniendo el modo USD o Bs
+  const updateInlineAmount = (baskets, bleach, degreaser, customBaseUSD = null) => {
+    const unit = prices.comboFull || 7.50;
+    const bPrice = prices.bleach || 0.50;
+    const dPrice = prices.degreaser || 0.50;
+    const base = customBaseUSD !== null ? customBaseUSD : (baskets * unit);
+    const extras = (bleach * bPrice) + (degreaser * dPrice);
+    const totalUSD = (base + extras).toFixed(2);
+    const rate = exchangeRate || 40.50;
+    if (inlineCurrencyMode === 'BS') {
+      setInlineAmountUSD((parseFloat(totalUSD) * rate).toFixed(2));
+    } else {
+      setInlineAmountUSD(totalUSD);
+    }
+  };
+
   // Cambio dinámico de cestas y sincronización de servicios para carga rápida
   const handleInlineBasketsChange = (newCount) => {
     const val = Math.max(1, newCount);
@@ -259,14 +275,52 @@ export default function EmployeeWorkStation() {
     setInlineSoapCount(val);
     setInlineLaborCount(val);
     setInlineSoftenerCount(val);
-    const unit = prices.comboFull || 7.50;
-    const totalUSD = (val * unit).toFixed(2);
-    if (inlineCurrencyMode === 'BS') {
-      const rate = exchangeRate || 40.50;
-      setInlineAmountUSD((parseFloat(totalUSD) * rate).toFixed(2));
+    updateInlineAmount(val, inlineBleachCount, inlineDegreaserCount);
+  };
+
+  // Sumar o restar Cloro en la barra rápida (+/- $0.50)
+  const handleInlineBleachChange = (delta) => {
+    const nextVal = Math.max(0, inlineBleachCount + delta);
+    setInlineBleachCount(nextVal);
+    updateInlineAmount(inlineBaskets, nextVal, inlineDegreaserCount);
+  };
+
+  // Sumar o restar Desengrasante en la barra rápida (+/- $0.50)
+  const handleInlineDegreaserChange = (delta) => {
+    const nextVal = Math.max(0, inlineDegreaserCount + delta);
+    setInlineDegreaserCount(nextVal);
+    updateInlineAmount(inlineBaskets, inlineBleachCount, nextVal);
+  };
+
+  // Modificar servicios en el modal detallado recalculando el monto en vivo
+  const handleModalServiceChange = (key, newVal) => {
+    const val = Math.max(0, newVal);
+    let w = washCount, d = dryCount, j = soapCount, mo = laborCount, su = softenerCount, cl = bleachCount, de = degreaserCount;
+    if (key === 'wash') { w = val; setWashCount(val); }
+    else if (key === 'dry') { d = val; setDryCount(val); }
+    else if (key === 'soap') { j = val; setSoapCount(val); }
+    else if (key === 'labor') { mo = val; setLaborCount(val); }
+    else if (key === 'softener') { su = val; setSoftenerCount(val); }
+    else if (key === 'bleach') { cl = val; setBleachCount(val); }
+    else if (key === 'degreaser') { de = val; setDegreaserCount(val); }
+
+    let sum = 0;
+    if (w > 0 && w === d && w === j && w === mo && w === su) {
+      sum = (w * (prices.comboFull || 7.50)) + (cl * (prices.bleach || 0.50)) + (de * (prices.degreaser || 0.50));
     } else {
-      setInlineAmountUSD(totalUSD);
+      sum = (w * (prices.washOnly || 4.00)) +
+            (d * (prices.dryOnly || 3.00)) +
+            (j * (prices.soap || 0.50)) +
+            (mo * (prices.labor || 0.20)) +
+            (su * (prices.softener || 0.70)) +
+            (cl * (prices.bleach || 0.50)) +
+            (de * (prices.degreaser || 0.50));
     }
+    setManualTotalUSD(sum.toFixed(2));
+    let n = `${w} Cesta(s)`;
+    if (cl > 0) n += ` + ${cl} Cloro`;
+    if (de > 0) n += ` + ${de} Desengrasante`;
+    setNotes(n);
   };
 
   // Abrir Modal para Corregir/Editar Servicios de un Registro
@@ -306,10 +360,12 @@ export default function EmployeeWorkStation() {
       amountPaidUSD,
       amountPaidBs: amountPaidUSD * rate,
       debtUSD,
-      notes: recordToEditServices.notes || `${editWashCount} Cesta(s) (${editWashCount} lav, ${editDryCount} sec)`
+      notes: (editBleachCount > 0 || editDegreaserCount > 0)
+        ? `${editWashCount} Cesta(s) (${editWashCount} lav, ${editDryCount} sec)${editBleachCount > 0 ? ` + ${editBleachCount} Cloro ($${(editBleachCount * (prices.bleach || 0.50)).toFixed(2)})` : ''}${editDegreaserCount > 0 ? ` + ${editDegreaserCount} Desengrasante ($${(editDegreaserCount * (prices.degreaser || 0.50)).toFixed(2)})` : ''}`
+        : (recordToEditServices.notes || `${editWashCount} Cesta(s) (${editWashCount} lav, ${editDryCount} sec)`)
     });
 
-    setInlineSuccessToast(`✅ Servicios actualizados para "${recordToEditServices.customerName}": L:${editWashCount} · S:${editDryCount} · J:${editSoapCount} · Suav:${editSoftenerCount}`);
+    setInlineSuccessToast(`✅ Servicios actualizados para "${recordToEditServices.customerName}": L:${editWashCount} · S:${editDryCount} · J:${editSoapCount} · Suav:${editSoftenerCount}${editBleachCount > 0 ? ` · Cl:${editBleachCount}` : ''}${editDegreaserCount > 0 ? ` · Des:${editDegreaserCount}` : ''}`);
     setTimeout(() => setInlineSuccessToast(''), 4000);
     setEditServicesModalOpen(false);
     setRecordToEditServices(null);
@@ -356,6 +412,13 @@ export default function EmployeeWorkStation() {
       }
     }
 
+    let notesText = inlineNotes.trim();
+    if (!notesText) {
+      notesText = `${finalWash} Cesta(s) (${finalWash} lav, ${finalDry} sec)`;
+      if (finalBleach > 0) notesText += ` + ${finalBleach} Cloro ($${(finalBleach * 0.50).toFixed(2)})`;
+      if (finalDegreaser > 0) notesText += ` + ${finalDegreaser} Desengrasante ($${(finalDegreaser * 0.50).toFixed(2)})`;
+    }
+
     addDailyRecord({
       date: selectedDate,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -380,10 +443,10 @@ export default function EmployeeWorkStation() {
       deliveryStatus: 'in_store',
       origin: 'walk_in',
       intakeStatus: 'confirmed',
-      notes: inlineNotes.trim() || `${finalWash} Cesta(s) (${finalWash} lav, ${finalDry} sec)`
+      notes: notesText
     });
 
-    setInlineSuccessToast(`✅ "${inlineClientName.trim()}" registrado · ${finalWash} Cesta(s) · $${numUSD.toFixed(2)} USD ≈ Bs. ${numBs.toLocaleString('es-VE', {minimumFractionDigits:2})}`);
+    setInlineSuccessToast(`✅ "${inlineClientName.trim()}" registrado · ${finalWash} Cesta(s)${finalBleach > 0 ? ` + ${finalBleach} Cloro` : ''}${finalDegreaser > 0 ? ` + ${finalDegreaser} Deseng` : ''} · $${numUSD.toFixed(2)} USD ≈ Bs. ${numBs.toLocaleString('es-VE', {minimumFractionDigits:2})}`);
     setTimeout(() => setInlineSuccessToast(''), 4000);
 
     setInlineClientName('');
@@ -1038,6 +1101,118 @@ export default function EmployeeWorkStation() {
                 </div>
               </div>
 
+              {/* Fila de Adicionales por Cesta en Barra Rápida */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 bg-blue-50/80 border border-blue-200/90 px-3.5 py-2.5 rounded-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black shrink-0">
+                    🧪
+                  </span>
+                  <div>
+                    <span className="text-xs font-black text-blue-950 block leading-tight">
+                      Adicionales a elección por cesta:
+                    </span>
+                    <span className="text-[11px] text-slate-500 block leading-none mt-0.5">
+                      Suma o resta cloro o desengrasante solo a las cestas que lo requieran (+$0.50 c/u)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  {/* Cloro Stepper */}
+                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
+                    inlineBleachCount > 0 
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                      : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300'
+                  }`}>
+                    <span className="text-xs font-extrabold flex items-center gap-1">
+                      <span>🧪 Cloro:</span>
+                      <span className={`text-[10px] font-black px-1 rounded ${inlineBleachCount > 0 ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-700'}`}>
+                        {inlineBleachCount > 0 ? `+$${(inlineBleachCount * 0.50).toFixed(2)}` : '+$0.50'}
+                      </span>
+                    </span>
+                    <div className="flex items-center gap-1 ml-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleInlineBleachChange(-1)}
+                        className={`w-6 h-6 rounded-lg font-black text-sm flex items-center justify-center transition-colors active:scale-95 ${
+                          inlineBleachCount > 0 ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                        title="Restar cloro"
+                      >
+                        -
+                      </button>
+                      <span className="font-mono font-black text-xs w-5 text-center select-none">
+                        {inlineBleachCount}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleInlineBleachChange(+1)}
+                        className={`w-6 h-6 rounded-lg font-black text-sm flex items-center justify-center transition-colors active:scale-95 ${
+                          inlineBleachCount > 0 ? 'bg-white hover:bg-blue-50 text-blue-700' : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
+                        title="Sumar cloro (+$0.50)"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Desengrasante Stepper */}
+                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
+                    inlineDegreaserCount > 0 
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                      : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300'
+                  }`}>
+                    <span className="text-xs font-extrabold flex items-center gap-1">
+                      <span>🧽 Desengrasante:</span>
+                      <span className={`text-[10px] font-black px-1 rounded ${inlineDegreaserCount > 0 ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-700'}`}>
+                        {inlineDegreaserCount > 0 ? `+$${(inlineDegreaserCount * 0.50).toFixed(2)}` : '+$0.50'}
+                      </span>
+                    </span>
+                    <div className="flex items-center gap-1 ml-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleInlineDegreaserChange(-1)}
+                        className={`w-6 h-6 rounded-lg font-black text-sm flex items-center justify-center transition-colors active:scale-95 ${
+                          inlineDegreaserCount > 0 ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                        title="Restar desengrasante"
+                      >
+                        -
+                      </button>
+                      <span className="font-mono font-black text-xs w-5 text-center select-none">
+                        {inlineDegreaserCount}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleInlineDegreaserChange(+1)}
+                        className={`w-6 h-6 rounded-lg font-black text-sm flex items-center justify-center transition-colors active:scale-95 ${
+                          inlineDegreaserCount > 0 ? 'bg-white hover:bg-blue-50 text-blue-700' : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
+                        title="Sumar desengrasante (+$0.50)"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Botón limpiar adicionales */}
+                  {(inlineBleachCount > 0 || inlineDegreaserCount > 0) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInlineBleachCount(0);
+                        setInlineDegreaserCount(0);
+                        updateInlineAmount(inlineBaskets, 0, 0);
+                      }}
+                      className="text-[11px] font-bold text-red-600 hover:underline px-1.5 py-0.5"
+                    >
+                      Limpiar adicionales
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Atajos Rápidos de Carga y Desglose Visual */}
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -1091,7 +1266,7 @@ export default function EmployeeWorkStation() {
                       setInlineSoapCount(1);
                       setInlineLaborCount(1);
                       setInlineSoftenerCount(0);
-                      setInlineAmountUSD('4.50');
+                      updateInlineAmount(1, inlineBleachCount, inlineDegreaserCount, 4.50);
                       setInlineNotes('Solo Lavado + Jabón ($4.50)');
                     }}
                     className="px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold border border-slate-200"
@@ -1107,7 +1282,7 @@ export default function EmployeeWorkStation() {
                       setInlineSoapCount(0);
                       setInlineLaborCount(1);
                       setInlineSoftenerCount(0);
-                      setInlineAmountUSD('3.00');
+                      updateInlineAmount(1, inlineBleachCount, inlineDegreaserCount, 3.00);
                       setInlineNotes('Solo Secado ($3.00)');
                     }}
                     className="px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold border border-slate-200"
@@ -1123,7 +1298,7 @@ export default function EmployeeWorkStation() {
                       setInlineSoapCount(1);
                       setInlineLaborCount(1);
                       setInlineSoftenerCount(1);
-                      setInlineAmountUSD('10.00');
+                      updateInlineAmount(1, inlineBleachCount, inlineDegreaserCount, 10.00);
                       setInlineNotes('Edredón Individual ($10.00)');
                     }}
                     className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200"
@@ -1139,7 +1314,7 @@ export default function EmployeeWorkStation() {
                       setInlineSoapCount(1);
                       setInlineLaborCount(1);
                       setInlineSoftenerCount(1);
-                      setInlineAmountUSD('12.00');
+                      updateInlineAmount(1, inlineBleachCount, inlineDegreaserCount, 12.00);
                       setInlineNotes('Edredón Matrimonial ($12.00)');
                     }}
                     className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200"
@@ -1155,7 +1330,7 @@ export default function EmployeeWorkStation() {
                       setInlineSoapCount(1);
                       setInlineLaborCount(1);
                       setInlineSoftenerCount(1);
-                      setInlineAmountUSD('14.00');
+                      updateInlineAmount(1, inlineBleachCount, inlineDegreaserCount, 14.00);
                       setInlineNotes('Edredón Grande ($14.00)');
                     }}
                     className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200"
@@ -1171,7 +1346,7 @@ export default function EmployeeWorkStation() {
                       setInlineSoapCount(4);
                       setInlineLaborCount(4);
                       setInlineSoftenerCount(4);
-                      setInlineAmountUSD('32.00');
+                      updateInlineAmount(4, inlineBleachCount, inlineDegreaserCount, 32.00);
                       setInlineNotes('Forros de Autobús ($32.00)');
                     }}
                     className="px-2.5 py-1 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 text-xs font-bold border border-cyan-200"
@@ -1188,6 +1363,12 @@ export default function EmployeeWorkStation() {
                   <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">🧼 J: {inlineSoapCount}</span>
                   <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">✋ MO: {inlineLaborCount}</span>
                   <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-purple-700 font-black">🌸 Suav: {inlineSoftenerCount}</span>
+                  {inlineBleachCount > 0 && (
+                    <span className="bg-cyan-50 px-2 py-0.5 rounded-lg border border-cyan-300 text-cyan-800 font-black">🧪 Cloro: {inlineBleachCount}</span>
+                  )}
+                  {inlineDegreaserCount > 0 && (
+                    <span className="bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-300 text-amber-800 font-black">🧽 Deseng: {inlineDegreaserCount}</span>
+                  )}
                 </div>
               </div>
             </form>
@@ -2189,20 +2370,20 @@ export default function EmployeeWorkStation() {
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">Cantidades de Servicios por Cesta (Personalizable):</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                   {[
-                    { label: 'Lavado', val: washCount, setter: setWashCount },
-                    { label: 'Secado', val: dryCount, setter: setDryCount },
-                    { label: 'Jabón', val: soapCount, setter: setSoapCount },
-                    { label: 'Mano O.', val: laborCount, setter: setLaborCount },
-                    { label: 'Suaviz.', val: softenerCount, setter: setSoftenerCount },
-                    { label: 'Cloro', val: bleachCount, setter: setBleachCount },
-                    { label: 'Deseng.', val: degreaserCount, setter: setDegreaserCount }
+                    { key: 'wash', label: 'Lavado', val: washCount },
+                    { key: 'dry', label: 'Secado', val: dryCount },
+                    { key: 'soap', label: 'Jabón', val: soapCount },
+                    { key: 'labor', label: 'Mano O.', val: laborCount },
+                    { key: 'softener', label: 'Suaviz.', val: softenerCount },
+                    { key: 'bleach', label: 'Cloro', val: bleachCount },
+                    { key: 'degreaser', label: 'Deseng.', val: degreaserCount }
                   ].map((s, i) => (
                     <div key={i} className="bg-slate-50 p-2 rounded-xl border border-slate-200 text-center">
                       <p className="text-[10px] font-bold text-slate-600 mb-1">{s.label}</p>
                       <div className="flex items-center justify-between gap-1">
                         <button
                           type="button"
-                          onClick={() => s.setter(Math.max(0, s.val - 1))}
+                          onClick={() => handleModalServiceChange(s.key, s.val - 1)}
                           className="w-6 h-6 rounded bg-white border border-slate-200 text-slate-700 font-bold flex items-center justify-center hover:bg-blue-600 hover:text-white"
                         >
                           -
@@ -2210,7 +2391,7 @@ export default function EmployeeWorkStation() {
                         <span className="font-bold text-sm text-slate-900 w-4 text-center">{s.val}</span>
                         <button
                           type="button"
-                          onClick={() => s.setter(s.val + 1)}
+                          onClick={() => handleModalServiceChange(s.key, s.val + 1)}
                           className="w-6 h-6 rounded bg-white border border-slate-200 text-slate-700 font-bold flex items-center justify-center hover:bg-blue-600 hover:text-white"
                         >
                           +
@@ -2224,9 +2405,19 @@ export default function EmployeeWorkStation() {
               {/* Montos y Totales */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-blue-50/70 p-3.5 rounded-2xl border border-blue-200">
                 <div>
-                  <label className="block text-xs font-bold text-blue-900 mb-1">
-                    Monto Designado a Cobrar ($ USD) *:
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-blue-900">
+                      Monto Designado a Cobrar ($ USD) *:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setManualTotalUSD(calculatedUSD.toFixed(2))}
+                      className="text-[10px] font-black text-blue-700 bg-white hover:bg-blue-100 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs"
+                      title="Recalcular con tarifas oficiales"
+                    >
+                      ⚡ Sugerido: ${calculatedUSD.toFixed(2)}
+                    </button>
+                  </div>
                   <input
                     type="number"
                     step="any"
@@ -2769,7 +2960,32 @@ export default function EmployeeWorkStation() {
 
               {/* Monto Total Cobrado */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Monto Total USD ($):</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">Monto Total USD ($):</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const w = editWashCount, d = editDryCount, j = editSoapCount, mo = editLaborCount, su = editSoftenerCount, cl = editBleachCount, de = editDegreaserCount;
+                      let sum = 0;
+                      if (w > 0 && w === d && w === j && w === mo && w === su) {
+                        sum = (w * (prices.comboFull || 7.50)) + (cl * (prices.bleach || 0.50)) + (de * (prices.degreaser || 0.50));
+                      } else {
+                        sum = (w * (prices.washOnly || 4.00)) +
+                              (d * (prices.dryOnly || 3.00)) +
+                              (j * (prices.soap || 0.50)) +
+                              (mo * (prices.labor || 0.20)) +
+                              (su * (prices.softener || 0.70)) +
+                              (cl * (prices.bleach || 0.50)) +
+                              (de * (prices.degreaser || 0.50));
+                      }
+                      setEditTotalUSD(sum.toFixed(2));
+                    }}
+                    className="text-[10px] font-black text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs"
+                    title="Recalcular monto según servicios seleccionados"
+                  >
+                    ⚡ Recalcular Sugerido
+                  </button>
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"

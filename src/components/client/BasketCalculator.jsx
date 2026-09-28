@@ -34,17 +34,15 @@ export default function BasketCalculator() {
   // Plan base de servicio: 'comboFull' ($7.50) | 'washWithSoap' ($4.50) | 'custom'
   const [basePlan, setBasePlan] = useState('comboFull');
 
-  // Adicionales que se pueden sumar a cualquier combo sin perder el ahorro del paquete
-  const [addBleach, setAddBleach] = useState(false);         // Cloro: $0.50
-  const [addDegreaser, setAddDegreaser] = useState(false);   // Desengrasante: $0.50
+  // Adicionales por cesta a elección (Cloro y Desengrasante se eligen de forma individual por cesta)
+  const [bleachBaskets, setBleachBaskets] = useState(0);         // Cloro: $0.50 por cesta elegida
+  const [degreaserBaskets, setDegreaserBaskets] = useState(0);   // Desengrasante: $0.50 por cesta elegida
 
   // Opciones exclusivas para cuando el cliente elige modo 'custom' (A tu medida)
   const [customWash, setCustomWash] = useState(true);          // $4.00
   const [customDry, setCustomDry] = useState(true);            // $3.00
   const [customSoap, setCustomSoap] = useState(true);          // $0.50
   const [customSoftener, setCustomSoftener] = useState(true);  // $0.70
-  const [customBleach, setCustomBleach] = useState(false);     // $0.50
-  const [customDegreaser, setCustomDegreaser] = useState(false); // $0.50
   const [customLabor, setCustomLabor] = useState(true);        // $0.20
 
   // Cálculos de prendas y capacidad con tolerancia de sobrepeso
@@ -92,41 +90,31 @@ export default function BasketCalculator() {
     : 0;
 
   // Precio unitario por cesta según combo y productos adicionales
+  let baseBasketPrice = 0;
   let basketUnitPrice = 0;
   let planTitleSummary = '';
-  let extrasList = [];
 
   const bleachPrice = prices.bleach ?? 0.50;
   const degreaserPrice = prices.degreaser ?? 0.50;
 
   if (basePlan === 'comboFull') {
-    let price = prices.comboFull || 7.50;
-    if (addBleach) {
-      price += bleachPrice;
-      extrasList.push(`Cloro (+$${bleachPrice.toFixed(2)})`);
-    }
-    if (addDegreaser) {
-      price += degreaserPrice;
-      extrasList.push(`Desengrasante (+$${degreaserPrice.toFixed(2)})`);
-    }
-    basketUnitPrice = price;
-    planTitleSummary = extrasList.length > 0 
-      ? `⭐ Combo Estrella VIP ($7.50) + ${extrasList.join(' + ')}`
-      : '⭐ Combo Estrella VIP ($7.50)';
+    baseBasketPrice = prices.comboFull || 7.50;
+    basketUnitPrice = baseBasketPrice;
+    let title = `⭐ Combo Estrella VIP ($${baseBasketPrice.toFixed(2)} c/u)`;
+    const extras = [];
+    if (bleachBaskets > 0) extras.push(`${bleachBaskets} Cloro (+$${(bleachBaskets * bleachPrice).toFixed(2)})`);
+    if (degreaserBaskets > 0) extras.push(`${degreaserBaskets} Desengrasante (+$${(degreaserBaskets * degreaserPrice).toFixed(2)})`);
+    if (extras.length > 0) title += ` + ${extras.join(' + ')}`;
+    planTitleSummary = title;
   } else if (basePlan === 'washWithSoap') {
-    let price = prices.washWithSoapCombo || 4.50;
-    if (addBleach) {
-      price += bleachPrice;
-      extrasList.push(`Cloro (+$${bleachPrice.toFixed(2)})`);
-    }
-    if (addDegreaser) {
-      price += degreaserPrice;
-      extrasList.push(`Desengrasante (+$${degreaserPrice.toFixed(2)})`);
-    }
-    basketUnitPrice = price;
-    planTitleSummary = extrasList.length > 0 
-      ? `💧 Lavado + Jabón ($4.50) + ${extrasList.join(' + ')}`
-      : '💧 Lavado + Jabón ($4.50)';
+    baseBasketPrice = prices.washWithSoapCombo || 4.50;
+    basketUnitPrice = baseBasketPrice;
+    let title = `💧 Lavado + Jabón ($${baseBasketPrice.toFixed(2)} c/u)`;
+    const extras = [];
+    if (bleachBaskets > 0) extras.push(`${bleachBaskets} Cloro (+$${(bleachBaskets * bleachPrice).toFixed(2)})`);
+    if (degreaserBaskets > 0) extras.push(`${degreaserBaskets} Desengrasante (+$${(degreaserBaskets * degreaserPrice).toFixed(2)})`);
+    if (extras.length > 0) title += ` + ${extras.join(' + ')}`;
+    planTitleSummary = title;
   } else {
     // Modo A la Medida
     let customSum = 0;
@@ -135,16 +123,23 @@ export default function BasketCalculator() {
     if (customDry) { customSum += (prices.dryOnly || 3.00); activeCustom.push('Secado'); }
     if (customSoap) { customSum += (prices.soap || 0.50); activeCustom.push('Jabón'); }
     if (customSoftener) { customSum += (prices.softener || 0.70); activeCustom.push('Suavizante'); }
-    if (customBleach) { customSum += bleachPrice; activeCustom.push('Cloro'); }
-    if (customDegreaser) { customSum += degreaserPrice; activeCustom.push('Desengrasante'); }
     if (customLabor) { customSum += (prices.labor || 0.20); activeCustom.push('Mano de obra'); }
     
-    basketUnitPrice = customSum;
-    planTitleSummary = `🛠️ A tu Medida: ${activeCustom.length > 0 ? activeCustom.join(', ') : 'Ningún servicio'}`;
+    baseBasketPrice = customSum;
+    basketUnitPrice = baseBasketPrice;
+    let title = `🛠️ A tu Medida: ${activeCustom.length > 0 ? activeCustom.join(', ') : 'Ningún servicio'}`;
+    const extras = [];
+    if (bleachBaskets > 0) extras.push(`${bleachBaskets} Cloro (+$${(bleachBaskets * bleachPrice).toFixed(2)})`);
+    if (degreaserBaskets > 0) extras.push(`${degreaserBaskets} Desengrasante (+$${(degreaserBaskets * degreaserPrice).toFixed(2)})`);
+    if (extras.length > 0) title += ` + ${extras.join(' + ')}`;
+    planTitleSummary = title;
   }
 
-  // Costo por cestas de ropa
-  const subtotalClothes = effectiveBaskets * basketUnitPrice;
+  // Costo por cestas base de ropa + costo por productos adicionales seleccionados por cesta
+  const subtotalBaseClothes = effectiveBaskets * baseBasketPrice;
+  const subtotalBleach = bleachBaskets * bleachPrice;
+  const subtotalDegreaser = degreaserBaskets * degreaserPrice;
+  const subtotalClothes = subtotalBaseClothes + subtotalBleach + subtotalDegreaser;
 
   // Costo por Edredones
   const totalComfortersCount = comforterSingle + comforterDouble + comforterLarge;
@@ -170,8 +165,8 @@ export default function BasketCalculator() {
     setDirectBaskets(1);
     setUseDirectBaskets(false);
     setBasePlan('comboFull');
-    setAddBleach(false);
-    setAddDegreaser(false);
+    setBleachBaskets(0);
+    setDegreaserBaskets(0);
   };
 
   // Mensaje para WhatsApp con la frase oficial requerida
@@ -198,8 +193,15 @@ export default function BasketCalculator() {
     if (effectiveBaskets > 0) {
       lines.push('');
       lines.push(`⚙️ *Plan para la ropa:* ${planTitleSummary}`);
-      lines.push(`  ↳ Tarifa: $${basketUnitPrice.toFixed(2)} por cesta`);
-      lines.push(`  ↳ Subtotal Ropa: *${effectiveBaskets} cesta(s) × $${basketUnitPrice.toFixed(2)} = $${subtotalClothes.toFixed(2)} USD*`);
+      lines.push(`  ↳ Tarifa base: $${baseBasketPrice.toFixed(2)} por cesta`);
+      lines.push(`  ↳ Cestas de ropa: *${effectiveBaskets} cesta(s) × $${baseBasketPrice.toFixed(2)} = $${subtotalBaseClothes.toFixed(2)} USD*`);
+      if (bleachBaskets > 0) {
+        lines.push(`  ↳ 🧪 Cloro: *${bleachBaskets} cesta(s) × $${bleachPrice.toFixed(2)} = +$${subtotalBleach.toFixed(2)} USD*`);
+      }
+      if (degreaserBaskets > 0) {
+        lines.push(`  ↳ 🧽 Desengrasante: *${degreaserBaskets} cesta(s) × $${degreaserPrice.toFixed(2)} = +$${subtotalDegreaser.toFixed(2)} USD*`);
+      }
+      lines.push(`  ↳ Subtotal Ropa: *$${subtotalClothes.toFixed(2)} USD*`);
     }
 
     if (totalComfortersCount > 0) {
@@ -244,8 +246,8 @@ export default function BasketCalculator() {
       soapCount: calculatedSoapCount,
       laborCount: calculatedLaborCount,
       softenerCount: calculatedSoftenerCount,
-      bleachCount: addBleach ? 1 : 0,
-      degreaserCount: addDegreaser ? 1 : 0,
+      bleachCount: bleachBaskets,
+      degreaserCount: degreaserBaskets,
       totalUSD: totalUSD,
       totalBs: totalBs,
       amountPaidUSD: 0,
@@ -257,7 +259,7 @@ export default function BasketCalculator() {
       deliveryStatus: 'in_store',
       origin: 'app',
       intakeStatus: 'pending_intake',
-      notes: `📲 Pedido desde la App: ${useDirectBaskets ? `${directBaskets} cestas directas (Sin especificar prendas - Por verificar y pesar en físico por el personal)` : `${totalClothesCount} prendas (~${effectiveBaskets} cestas, ${totalWeightApprox.toFixed(1)} kg${isOverweight ? ` - Sobrepeso +${overweightKg.toFixed(1)} kg` : ''})`}${totalComfortersCount > 0 ? ` + ${totalComfortersCount} edredón(es)` : ''} · ${planTitleSummary}`
+      notes: `📲 Pedido desde la App: ${useDirectBaskets ? `${directBaskets} cestas directas` : `${totalClothesCount} prendas (~${effectiveBaskets} cestas, ${totalWeightApprox.toFixed(1)} kg${isOverweight ? ` - Sobrepeso +${overweightKg.toFixed(1)} kg` : ''})`}${totalComfortersCount > 0 ? ` + ${totalComfortersCount} edredón(es)` : ''}${bleachBaskets > 0 ? ` + ${bleachBaskets} Cloro ($${(bleachBaskets * bleachPrice).toFixed(2)})` : ''}${degreaserBaskets > 0 ? ` + ${degreaserBaskets} Desengrasante ($${(degreaserBaskets * degreaserPrice).toFixed(2)})` : ''} · ${planTitleSummary}`
     });
 
     setSentOrderDetails({
@@ -796,99 +798,164 @@ export default function BasketCalculator() {
           </div>
         </div>
 
-        {/* SI ESTÁ EN COMBO: SECCIÓN DE PRODUCTOS ESPECIALES ADICIONALES (CLORO Y DESENGRASANTE) */}
-        {basePlan !== 'custom' ? (
-          <div key="combo-addons" className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">✨</span>
-                <div>
-                  <h4 className="font-black text-slate-900 text-xs sm:text-sm">
-                    ¿Deseas agregar Cloro o Desengrasante a tu combo?
-                  </h4>
-                  <p className="text-[11px] text-slate-600">
-                    Se suman directamente a tu combo por solo <strong>$0.50 c/u</strong> sin perder tu tarifa con descuento.
-                  </p>
+        {/* SECCIÓN DE PRODUCTOS ESPECIALES ADICIONALES (CLORO Y DESENGRASANTE) POR CESTA */}
+        <div key="combo-addons" className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200 mt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">✨</span>
+              <div>
+                <h4 className="font-black text-slate-900 text-xs sm:text-sm">
+                  ¿Deseas agregar Cloro o Desengrasante por cesta?
+                </h4>
+                <p className="text-[11px] text-slate-600">
+                  Los productos adicionales se eligen <strong>por cesta de forma independiente</strong> por solo <strong>$0.50 c/u</strong>.
+                </p>
+              </div>
+            </div>
+            {(bleachBaskets > 0 || degreaserBaskets > 0) && (
+              <button
+                type="button"
+                onClick={() => { setBleachBaskets(0); setDegreaserBaskets(0); }}
+                className="text-[11px] text-red-600 hover:underline font-bold self-start sm:self-auto"
+              >
+                Quitar adicionales
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            
+            {/* Tarjeta Cloro con Stepper por Cesta */}
+            <div className={`p-3.5 rounded-2xl border transition-all ${
+              bleachBaskets > 0 
+                ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-400/20' 
+                : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300'
+            }`}>
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-2xl">🧪</span>
+                  <div>
+                    <p className="font-black text-xs sm:text-sm">Cloro Blanqueador</p>
+                    <p className={`text-[10px] ${bleachBaskets > 0 ? 'text-blue-100' : 'text-slate-500'}`}>
+                      Prendas blancas o percudidas ($0.50 c/u)
+                    </p>
+                  </div>
+                </div>
+                <span className={`text-xs font-black px-2 py-0.5 rounded ${bleachBaskets > 0 ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-700'}`}>
+                  {bleachBaskets > 0 ? `+$${(bleachBaskets * bleachPrice).toFixed(2)}` : '+$0.50'}
+                </span>
+              </div>
+
+              {/* Stepper interactivo para sumar o restar */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200/40">
+                <span className={`text-[11px] font-bold ${bleachBaskets > 0 ? 'text-blue-100' : 'text-slate-600'}`}>
+                  Cestas con cloro:
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBleachBaskets(Math.max(0, bleachBaskets - 1))}
+                    className={`w-8 h-8 rounded-xl font-black text-base flex items-center justify-center transition-colors active:scale-95 ${
+                      bleachBaskets > 0 
+                        ? 'bg-blue-700 hover:bg-blue-800 text-white border border-blue-500' 
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                    }`}
+                    title="Restar una cesta con cloro"
+                  >
+                    -
+                  </button>
+                  <span className="font-mono font-black text-sm w-7 text-center select-none">
+                    {bleachBaskets}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setBleachBaskets(bleachBaskets + 1)}
+                    className={`w-8 h-8 rounded-xl font-black text-base flex items-center justify-center transition-colors active:scale-95 ${
+                      bleachBaskets > 0 
+                        ? 'bg-white hover:bg-blue-50 text-blue-700 border border-white' 
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                    title="Sumar una cesta con cloro"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-              
-              {/* Botón Cloro */}
-              <button
-                type="button"
-                onClick={() => setAddBleach(!addBleach)}
-                className={`p-3 rounded-xl border flex items-center justify-between text-left transition-all active:scale-98 ${
-                  addBleach 
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                    : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300'
-                }`}
-              >
+            {/* Tarjeta Desengrasante con Stepper por Cesta */}
+            <div className={`p-3.5 rounded-2xl border transition-all ${
+              degreaserBaskets > 0 
+                ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-400/20' 
+                : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300'
+            }`}>
+              <div className="flex items-center justify-between gap-2 mb-2.5">
                 <div className="flex items-center gap-2.5">
-                  <span className="text-xl">🧪</span>
+                  <span className="text-2xl">🧽</span>
                   <div>
-                    <p className="font-black text-xs">Cloro Blanqueador</p>
-                    <p className={`text-[10px] ${addBleach ? 'text-blue-100' : 'text-slate-500'}`}>
-                      Ideal para prendas blancas o percudidas
+                    <p className="font-black text-xs sm:text-sm">Desengrasante Industrial</p>
+                    <p className={`text-[10px] ${degreaserBaskets > 0 ? 'text-blue-100' : 'text-slate-500'}`}>
+                      Grasa pesada o mecánicos ($0.50 c/u)
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-black px-2 py-0.5 rounded ${addBleach ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-700'}`}>
-                    +$0.50
-                  </span>
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${addBleach ? 'bg-white text-blue-600' : 'border border-slate-300'}`}>
-                    {addBleach ? '✓' : ''}
-                  </span>
-                </div>
-              </button>
+                <span className={`text-xs font-black px-2 py-0.5 rounded ${degreaserBaskets > 0 ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-700'}`}>
+                  {degreaserBaskets > 0 ? `+$${(degreaserBaskets * degreaserPrice).toFixed(2)}` : '+$0.50'}
+                </span>
+              </div>
 
-              {/* Botón Desengrasante */}
-              <button
-                type="button"
-                onClick={() => setAddDegreaser(!addDegreaser)}
-                className={`p-3 rounded-xl border flex items-center justify-between text-left transition-all active:scale-98 ${
-                  addDegreaser 
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                    : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xl">🧽</span>
-                  <div>
-                    <p className="font-black text-xs">Desengrasante Industrial</p>
-                    <p className={`text-[10px] ${addDegreaser ? 'text-blue-100' : 'text-slate-500'}`}>
-                      Grasa pesada, mecánicos, manchas difíciles
-                    </p>
-                  </div>
-                </div>
+              {/* Stepper interactivo para sumar o restar */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200/40">
+                <span className={`text-[11px] font-bold ${degreaserBaskets > 0 ? 'text-blue-100' : 'text-slate-600'}`}>
+                  Cestas con desengrasante:
+                </span>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs font-black px-2 py-0.5 rounded ${addDegreaser ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-700'}`}>
-                    +$0.50
+                  <button
+                    type="button"
+                    onClick={() => setDegreaserBaskets(Math.max(0, degreaserBaskets - 1))}
+                    className={`w-8 h-8 rounded-xl font-black text-base flex items-center justify-center transition-colors active:scale-95 ${
+                      degreaserBaskets > 0 
+                        ? 'bg-blue-700 hover:bg-blue-800 text-white border border-blue-500' 
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                    }`}
+                    title="Restar una cesta con desengrasante"
+                  >
+                    -
+                  </button>
+                  <span className="font-mono font-black text-sm w-7 text-center select-none">
+                    {degreaserBaskets}
                   </span>
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${addDegreaser ? 'bg-white text-blue-600' : 'border border-slate-300'}`}>
-                    {addDegreaser ? '✓' : ''}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDegreaserBaskets(degreaserBaskets + 1)}
+                    className={`w-8 h-8 rounded-xl font-black text-base flex items-center justify-center transition-colors active:scale-95 ${
+                      degreaserBaskets > 0 
+                        ? 'bg-white hover:bg-blue-50 text-blue-700 border border-white' 
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                    title="Sumar una cesta con desengrasante"
+                  >
+                    +
+                  </button>
                 </div>
-              </button>
-
+              </div>
             </div>
+
           </div>
-        ) : (
-          /* MODO A TU MEDIDA: SELECTOR COMPLETO */
-          <div key="custom-service-buttons" className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+        </div>
+
+        {/* MODO A TU MEDIDA: SELECTOR COMPLETO DE SERVICIOS */}
+        {basePlan === 'custom' && (
+          <div key="custom-service-buttons" className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 mt-4">
             <p className="text-xs font-bold text-slate-700">
-              Selecciona los servicios individuales que deseas contratar:
+              Selecciona los servicios base por cesta que deseas contratar:
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {[
                 { id: 'wash', label: 'Lavado', price: prices.washOnly || 4.00, setter: setCustomWash, val: customWash, icon: '🫧' },
                 { id: 'dry', label: 'Secado', price: prices.dryOnly || 3.00, setter: setCustomDry, val: customDry, icon: '💨' },
                 { id: 'soap', label: 'Jabón', price: prices.soap || 0.50, setter: setCustomSoap, val: customSoap, icon: '🧴' },
                 { id: 'soft', label: 'Suaviz.', price: prices.softener || 0.70, setter: setCustomSoftener, val: customSoftener, icon: '🌸' },
-                { id: 'bleach', label: 'Cloro', price: bleachPrice, setter: setCustomBleach, val: customBleach, icon: '🧪' },
-                { id: 'degreaser', label: 'Desengr.', price: degreaserPrice, setter: setCustomDegreaser, val: customDegreaser, icon: '🧽' },
                 { id: 'labor', label: 'Mano Obra', price: prices.labor || 0.20, setter: setCustomLabor, val: customLabor, icon: '👔' }
               ].map((svc) => (
                 <button 
@@ -928,13 +995,37 @@ export default function BasketCalculator() {
             <div className="space-y-1.5 text-xs text-slate-200">
               {/* Línea de Ropa ordinaria */}
               {effectiveBaskets > 0 ? (
-                <div key="summary-baskets-row" className="flex flex-col sm:flex-row sm:items-center justify-between lg:justify-start gap-1 sm:gap-4">
-                  <span className="text-slate-300">
-                    🧺 <strong>{effectiveBaskets} Cesta(s)</strong> de ropa:
-                  </span>
-                  <span className="font-mono font-bold text-white">
-                    {effectiveBaskets} × ${basketUnitPrice.toFixed(2)} = <strong>${subtotalClothes.toFixed(2)} USD</strong>
-                  </span>
+                <div key="summary-baskets-row" className="space-y-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between lg:justify-start gap-1 sm:gap-4">
+                    <span className="text-slate-300">
+                      🧺 <strong>{effectiveBaskets} Cesta(s)</strong> de ropa:
+                    </span>
+                    <span className="font-mono font-bold text-white">
+                      {effectiveBaskets} × ${baseBasketPrice.toFixed(2)} = <strong>${subtotalBaseClothes.toFixed(2)} USD</strong>
+                    </span>
+                  </div>
+
+                  {bleachBaskets > 0 && (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between lg:justify-start gap-1 sm:gap-4 text-cyan-300">
+                      <span>
+                        🧪 <strong>{bleachBaskets} Cesta(s) con Cloro</strong>:
+                      </span>
+                      <span className="font-mono font-bold text-cyan-200">
+                        +{bleachBaskets} × ${bleachPrice.toFixed(2)} = <strong>+${subtotalBleach.toFixed(2)} USD</strong>
+                      </span>
+                    </div>
+                  )}
+
+                  {degreaserBaskets > 0 && (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between lg:justify-start gap-1 sm:gap-4 text-amber-300">
+                      <span>
+                        🧽 <strong>{degreaserBaskets} Cesta(s) con Desengrasante</strong>:
+                      </span>
+                      <span className="font-mono font-bold text-amber-200">
+                        +{degreaserBaskets} × ${degreaserPrice.toFixed(2)} = <strong>+${subtotalDegreaser.toFixed(2)} USD</strong>
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div key="summary-no-baskets-row" className="text-slate-400">
