@@ -18,8 +18,40 @@ export default function AccountingDashboard() {
 
   const [showCloudModal, setShowCloudModal] = useState(false);
   const [firebaseConfigInput, setFirebaseConfigInput] = useState('');
+  const [customApiKey, setCustomApiKey] = useState('');
+  const [customProjectId, setCustomProjectId] = useState('');
   const [cloudSyncStatusMsg, setCloudSyncStatusMsg] = useState('');
   const [isUploadingLocal, setIsUploadingLocal] = useState(false);
+
+  // Función ultra-robusta para auto-detectar campos de cualquier texto que pegue el usuario
+  const autoParseFirebaseText = (text) => {
+    setFirebaseConfigInput(text);
+    if (!text || !text.trim()) return;
+
+    // 1. Buscar apiKey
+    let foundKey = '';
+    const keyMatch = text.match(/apiKey["']?\s*[:=]\s*["']?([A-Za-z0-9_\-]+)["']?/i);
+    if (keyMatch && keyMatch[1]) {
+      foundKey = keyMatch[1];
+    } else {
+      // Fallback: patrón estándar de Google API key (AIzaSy...)
+      const directKey = text.match(/(AIza[0-9A-Za-z_\-]{30,45})/);
+      if (directKey) foundKey = directKey[1];
+    }
+    if (foundKey) setCustomApiKey(foundKey);
+
+    // 2. Buscar projectId
+    let foundProj = '';
+    const projMatch = text.match(/projectId["']?\s*[:=]\s*["']?([a-z0-9_\-]+)["']?/i);
+    if (projMatch && projMatch[1]) {
+      foundProj = projMatch[1];
+    } else {
+      // Fallback: buscar dominio .firebaseapp.com
+      const domainMatch = text.match(/([a-z0-9_\-]+)\.firebaseapp\.com/i);
+      if (domainMatch && domainMatch[1]) foundProj = domainMatch[1];
+    }
+    if (foundProj) setCustomProjectId(foundProj);
+  };
 
   const [adminTab, setAdminTab] = useState('metrics'); // 'metrics' | 'audit' | 'closures' | 'supplies'
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -882,74 +914,140 @@ export default function AccountingDashboard() {
 
             {/* Formulario de Configuración si no está conectado */}
             {!isCloudConnected && (
-              <div className="space-y-3">
-                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-xs space-y-1 text-slate-700">
-                  <p className="font-bold text-slate-900">¿Cómo activarlo gratis en 2 minutos?</p>
-                  <ol className="list-decimal list-inside space-y-0.5 text-[11px] text-slate-600">
-                    <li>Entra en <strong>console.firebase.google.com</strong> con tu Gmail.</li>
-                    <li>Crea un proyecto (ej: <em>lavanderia-aj</em>) y crea la base de datos <strong>Firestore</strong> en Modo de Prueba.</li>
-                    <li>En Configuración de proyecto &gt; Apps Web, copia el bloque <code>firebaseConfig</code> y pégalo abajo.</li>
-                  </ol>
+              <div className="space-y-4">
+                <div className="bg-blue-50/80 p-3.5 rounded-2xl border border-blue-200 text-xs space-y-1.5 text-slate-800">
+                  <p className="font-black text-blue-950 flex items-center gap-1.5">
+                    <span>💡 Instrucciones rápidas (Firebase Gratis Permanente):</span>
+                  </p>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Pega abajo el bloque que te dio Firebase, <strong>o si prefieres escribe tu API Key y Project ID directamente en las 2 casillas</strong>. El sistema los detecta automáticamente.
+                  </p>
                 </div>
 
+                {/* Opción A: Pegar todo el bloque */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Pega tu configuración de Firebase aquí:
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-black text-slate-900">
+                      1. Pega aquí el código que te dio Firebase:
+                    </label>
+                    {customApiKey && customProjectId && (
+                      <span className="text-[11px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                        ✓ Datos detectados
+                      </span>
+                    )}
+                  </div>
                   <textarea
-                    rows={5}
+                    rows={4}
                     value={firebaseConfigInput}
-                    onChange={(e) => setFirebaseConfigInput(e.target.value)}
-                    placeholder={'const firebaseConfig = {\n  apiKey: "AIzaSy...",\n  projectId: "lavanderia-aj-...",\n  authDomain: "..."\n};'}
-                    className="w-full p-3 rounded-xl border border-slate-300 font-mono text-xs text-slate-900 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500"
+                    onChange={(e) => autoParseFirebaseText(e.target.value)}
+                    placeholder={'Pega aquí todo lo que copiaste de Firebase (const firebaseConfig = { apiKey: "...", ... })'}
+                    className="w-full p-3 rounded-xl border border-slate-300 font-mono text-xs text-slate-900 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500 transition-all"
                   />
+                </div>
+
+                {/* Opción B: Las 2 casillas directas editables */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                  <p className="text-xs font-black text-slate-900">
+                    2. O verifica/escribe los 2 datos directamente:
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        API Key (apiKey) *:
+                      </label>
+                      <input
+                        type="text"
+                        value={customApiKey}
+                        onChange={(e) => setCustomApiKey(e.target.value.trim())}
+                        placeholder="Ej: AIzaSyA123456789..."
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-blue-500"
+                      />
+                      {customApiKey ? (
+                        <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">✓ Válida ({customApiKey.slice(0, 10)}...)</span>
+                      ) : (
+                        <span className="text-[10px] text-amber-600 font-semibold block mt-0.5">⚠️ Falta ingresar</span>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Project ID (projectId) *:
+                      </label>
+                      <input
+                        type="text"
+                        value={customProjectId}
+                        onChange={(e) => setCustomProjectId(e.target.value.trim().toLowerCase())}
+                        placeholder="Ej: lavanderia-aj o aj-express-123"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-blue-500"
+                      />
+                      {customProjectId ? (
+                        <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">✓ {customProjectId}</span>
+                      ) : (
+                        <span className="text-[10px] text-amber-600 font-semibold block mt-0.5">⚠️ Falta ingresar</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={async () => {
-                    const raw = firebaseConfigInput.trim();
-                    if (!raw) {
-                      alert('Por favor pega la configuración de Firebase.');
-                      return;
-                    }
-
-                    // Extraer los campos con regex flexible
-                    const extract = (key) => {
-                      const match = raw.match(new RegExp(`${key}["']?\s*:\s*["']([^"']+)["']`));
-                      return match ? match[1] : '';
-                    };
-
-                    const apiKey = extract('apiKey');
-                    const projectId = extract('projectId');
-                    const authDomain = extract('authDomain') || `${projectId}.firebaseapp.com`;
-                    const storageBucket = extract('storageBucket') || `${projectId}.appspot.com`;
-                    const messagingSenderId = extract('messagingSenderId') || '';
-                    const appId = extract('appId') || '';
+                    // Tomar customApiKey o autoParse
+                    let apiKey = customApiKey.trim();
+                    let projectId = customProjectId.trim();
 
                     if (!apiKey || !projectId) {
-                      alert('No se detectaron apiKey o projectId válidos. Revisa el texto pegado.');
+                      // Intento de rescate si solo pegaron en el textarea
+                      const raw = firebaseConfigInput.trim();
+                      if (raw) {
+                        const k = raw.match(/apiKey["']?\s*[:=]\s*["']?([A-Za-z0-9_\-]+)["']?/i) || raw.match(/(AIza[0-9A-Za-z_\-]{30,45})/);
+                        const p = raw.match(/projectId["']?\s*[:=]\s*["']?([a-z0-9_\-]+)["']?/i) || raw.match(/([a-z0-9_\-]+)\.firebaseapp\.com/i);
+                        if (k) apiKey = k[1];
+                        if (p) projectId = p[1];
+                      }
+                    }
+
+                    if (!apiKey) {
+                      alert('Por favor escribe o pega tu API Key (comienza por AIzaSy...).');
+                      return;
+                    }
+                    if (!projectId) {
+                      alert('Por favor escribe o pega tu Project ID (el nombre de tu proyecto en Firebase, ej: lavanderia-aj).');
                       return;
                     }
 
-                    const configObj = { apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId };
+                    const authDomain = `${projectId}.firebaseapp.com`;
+                    const storageBucket = `${projectId}.firebasestorage.app`;
+                    const configObj = { 
+                      apiKey, 
+                      authDomain, 
+                      projectId, 
+                      storageBucket, 
+                      messagingSenderId: '', 
+                      appId: '' 
+                    };
+
                     localStorage.setItem('aj_firebase_config', JSON.stringify(configObj));
 
                     try {
+                      setCloudSyncStatusMsg('Conectando a Google Cloud Firebase...');
                       const { initFirebase } = await import('../../services/firebase');
                       const { isConfigured, error } = initFirebase();
                       if (isConfigured) {
                         setIsCloudConnected(true);
-                        setCloudSyncStatusMsg('¡Conexión exitosa! Ahora tus dispositivos se sincronizan en vivo.');
+                        setCloudSyncStatusMsg('✅ ¡Conexión exitosa! Ahora todos tus dispositivos se sincronizan en vivo.');
                         setTimeout(() => setShowCloudModal(false), 2000);
                       } else {
-                        alert('Error al inicializar Firebase: ' + (error?.message || 'Verifica los datos'));
+                        alert('Error al conectar: ' + (error?.message || 'Verifica los datos'));
+                        setCloudSyncStatusMsg('');
                       }
                     } catch (e) {
                       alert('Error: ' + e.message);
+                      setCloudSyncStatusMsg('');
                     }
                   }}
-                  className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm uppercase shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all"
                 >
                   <span>💾 Guardar y Conectar en Vivo</span>
                 </button>
