@@ -536,18 +536,20 @@ export function AppProvider({ children }) {
   // --- MÉTODOS DEL CUADERNO DIARIO Y PANEL DE EMPLEADA ---
   const addDailyRecord = (newRecord) => {
     const nextId = `rec_${Date.now()}`;
+    const recDate = newRecord.date || new Date().toISOString().split('T')[0];
+    const isPaid = newRecord.paymentStatus === 'paid';
+    const isDelivered = newRecord.deliveryStatus === 'delivered';
     const record = {
       ...newRecord,
       id: nextId,
-      date: newRecord.date || new Date().toISOString().split('T')[0],
+      date: recDate,
       time: newRecord.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      paymentDate: isPaid ? (newRecord.paymentDate || recDate) : null,
       deliveryStatus: newRecord.deliveryStatus || 'in_store'
     };
     setDailyRecords(prev => [record, ...prev]);
 
     // Sincronizar automáticamente en la colección de Órdenes para que aparezca en Administración y Contabilidad
-    const isPaid = newRecord.paymentStatus === 'paid';
-    const isDelivered = newRecord.deliveryStatus === 'delivered';
     const orderFormat = {
       id: `AJ-${nextId.slice(4)}`,
       originalId: nextId,
@@ -563,6 +565,7 @@ export function AppProvider({ children }) {
       debtUSD: newRecord.debtUSD !== undefined ? newRecord.debtUSD : (isPaid ? 0 : newRecord.totalUSD),
       paymentStatus: newRecord.paymentStatus || 'pending',
       paymentMethod: newRecord.paymentMethod || 'pago_movil',
+      paymentDate: record.paymentDate,
       orderStatus: isDelivered ? 'delivered' : 'ready',
       deliveryStatus: newRecord.deliveryStatus || 'in_store',
       origin: newRecord.origin || 'walk_in',
@@ -606,8 +609,8 @@ export function AppProvider({ children }) {
     }));
   };
 
-  const markRecordDelivered = (id) => {
-    const today = new Date().toISOString().split('T')[0];
+  const markRecordDelivered = (id, deliveredDate) => {
+    const today = deliveredDate || new Date().toISOString().split('T')[0];
     setDailyRecords(prev => prev.map(r => r.id === id ? { 
       ...r, 
       deliveryStatus: 'delivered',
@@ -624,6 +627,7 @@ export function AppProvider({ children }) {
   };
 
   const markRecordPaid = (id, paymentData = {}) => {
+    const paymentDate = paymentData.paymentDate || new Date().toISOString().split('T')[0];
     setDailyRecords(prev => prev.map(r => {
       if (r.id === id) {
         return {
@@ -632,6 +636,7 @@ export function AppProvider({ children }) {
           amountPaidUSD: r.totalUSD,
           amountPaidBs: r.totalBs,
           debtUSD: 0,
+          paymentDate: paymentDate,
           paymentMethod: paymentData.paymentMethod || r.paymentMethod || 'usd_cash',
           bankReference: paymentData.bankReference || r.bankReference || 'Pagado en mostrador',
           notes: paymentData.notes ? `${r.notes ? r.notes + ' · ' : ''}${paymentData.notes}` : r.notes
@@ -644,6 +649,7 @@ export function AppProvider({ children }) {
     setOrders(prev => prev.map(o => (o.id === id || o.originalId === id || o.id === `AJ-${id.replace('rec_', '')}`) ? {
       ...o,
       paymentStatus: 'paid',
+      paymentDate: paymentDate,
       paymentMethod: paymentData.paymentMethod || o.paymentMethod || 'usd_cash'
     } : o));
   };
@@ -651,6 +657,23 @@ export function AppProvider({ children }) {
   // Verificación de Contraseña Administrativa
   const verifyAdminPassword = (password) => {
     return password === 'aj2026' || password === '1234';
+  };
+
+  // Agregar log a la auditoría
+  const logAuditAction = ({ action, entityType, entityId, reason, performedBy, details, recordSnapshot }) => {
+    const auditEntry = {
+      id: `aud_${Date.now()}`,
+      timestamp: `${new Date().toISOString().split('T')[0]} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+      action: action || 'MODIFICACION',
+      entityType: entityType || 'SISTEMA',
+      entityId: entityId || 'SYS',
+      reason: reason || 'Acción autorizada por administrador',
+      performedBy: performedBy || 'Administrador / Encargada',
+      details: details || '',
+      recordSnapshot: recordSnapshot || null
+    };
+    setAuditLogs(prev => [auditEntry, ...prev]);
+    return auditEntry;
   };
 
   // Borrado Estrictamente Protegido con Contraseña Maestra y Motivo Obligatorio
@@ -669,9 +692,7 @@ export function AppProvider({ children }) {
     }
 
     // Crear entrada inmutable en la Auditoría del Administrador
-    const auditEntry = {
-      id: `aud_${Date.now()}`,
-      timestamp: `${new Date().toISOString().split('T')[0]} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+    logAuditAction({
       action: 'ELIMINACIÓN_REGISTRO',
       entityType: 'CUADERNO_DIARIO',
       entityId: id,
@@ -687,9 +708,8 @@ export function AppProvider({ children }) {
         referencia: recordToDelete.bankReference || 'S/R',
         estadoPago: recordToDelete.paymentStatus
       }
-    };
+    });
 
-    setAuditLogs(prev => [auditEntry, ...prev]);
     setDailyRecords(prev => prev.filter(r => r.id !== id));
     setOrders(prev => prev.filter(o => o.id !== id && o.originalId !== id && o.id !== `AJ-${id.replace('rec_', '')}`));
 
@@ -710,15 +730,25 @@ export function AppProvider({ children }) {
     return newLog;
   };
 
-  // Guardar Cierre Diario de Caja
+  // Guardar Cierre Diario de Caja (Crea o actualiza si ya existe para esa fecha)
   const saveDailyClosure = (closureData) => {
+    const date = closureData.date || new Date().toISOString().split('T')[0];
     const newClosure = {
       ...closureData,
-      id: `close_${Date.now()}`,
-      closedAt: `${new Date().toISOString().split('T')[0]} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-      date: closureData.date || new Date().toISOString().split('T')[0]
+      id: closureData.id || `close_${Date.now()}`,
+      closedAt: closureData.closedAt || `${date} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+      date,
+      isClosed: true
     };
-    setDailyClosures([newClosure, ...dailyClosures]);
+    setDailyClosures(prev => {
+      const idx = prev.findIndex(c => c.date === date);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], ...newClosure };
+        return copy;
+      }
+      return [newClosure, ...prev];
+    });
     return newClosure;
   };
 
@@ -753,6 +783,7 @@ export function AppProvider({ children }) {
       markRecordPaid,
       verifyAdminPassword,
       deleteRecordWithAudit,
+      logAuditAction,
       addDetergentLog,
       saveDailyClosure
     }}>

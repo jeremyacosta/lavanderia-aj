@@ -15,7 +15,8 @@ export default function EmployeeWorkStation() {
     updateDailyRecord,
     markRecordDelivered, 
     markRecordPaid, 
-    deleteRecordWithAudit, 
+    deleteRecordWithAudit,
+    verifyAdminPassword,
     detergentLogs, 
     addDetergentLog, 
     dailyClosures, 
@@ -48,10 +49,19 @@ export default function EmployeeWorkStation() {
   const [inlineClientName, setInlineClientName] = useState('');
   const [inlineClientPhone, setInlineClientPhone] = useState('');
   const [inlineAmountUSD, setInlineAmountUSD] = useState('7.50');
+  const [inlineCurrencyMode, setInlineCurrencyMode] = useState('USD'); // 'USD' o 'BS'
   const [inlinePayMethod, setInlinePayMethod] = useState('usd_cash'); // 'usd_cash' | 'pago_movil' | 'bs_cash' | 'pending'
   const [inlineBankRef, setInlineBankRef] = useState('');
   const [inlineNotes, setInlineNotes] = useState('');
   const [inlineSuccessToast, setInlineSuccessToast] = useState('');
+
+  // === MODAL HACER CIERRE DEL DIA ===
+  const [closureModalOpen, setClosureModalOpen] = useState(false);
+  const [closureConfirmNotes, setClosureConfirmNotes] = useState('');
+  const [postClosureUnlockOpen, setPostClosureUnlockOpen] = useState(false);
+  const [postClosurePassword, setPostClosurePassword] = useState('');
+  const [postClosureError, setPostClosureError] = useState('');
+  const [postClosureUnlocked, setPostClosureUnlocked] = useState(false);
 
   // Estado del Formulario de Carga Rápida (Mostrador)
   const [showAddModal, setShowAddModal] = useState(false);
@@ -207,7 +217,16 @@ export default function EmployeeWorkStation() {
       return;
     }
 
-    const numUSD = parseFloat(inlineAmountUSD) || 0;
+    const rate = exchangeRate || 40.50;
+    // Calcular USD y Bs según moneda de entrada elegida
+    let numUSD, numBs;
+    if (inlineCurrencyMode === 'BS') {
+      numBs  = parseFloat(inlineAmountUSD) || 0; // el campo "inlineAmountUSD" contiene Bs cuando modo=BS
+      numUSD = numBs / rate;
+    } else {
+      numUSD = parseFloat(inlineAmountUSD) || 0;
+      numBs  = numUSD * rate;
+    }
     const isPending = inlinePayMethod === 'pending';
 
     addDailyRecord({
@@ -223,12 +242,13 @@ export default function EmployeeWorkStation() {
       bleachCount: 0,
       degreaserCount: 0,
       totalUSD: numUSD,
-      totalBs: numUSD * (exchangeRate || 40.50),
+      totalBs: numBs,
       amountPaidUSD: isPending ? 0 : numUSD,
-      amountPaidBs: isPending ? 0 : numUSD * (exchangeRate || 40.50),
+      amountPaidBs:  isPending ? 0 : numBs,
       debtUSD: isPending ? numUSD : 0,
       paymentStatus: isPending ? 'pending' : 'paid',
       paymentMethod: isPending ? 'usd_cash' : inlinePayMethod,
+      inputCurrency: inlineCurrencyMode, // registrar en qué moneda se ingresó
       bankReference: inlineBankRef.trim() || (inlinePayMethod === 'usd_cash' ? 'Efectivo $' : inlinePayMethod === 'bs_cash' ? 'Efectivo Bs' : isPending ? 'Debe al retirar' : 'Comprobante mostrador'),
       deliveryStatus: 'in_store',
       origin: 'walk_in',
@@ -236,7 +256,7 @@ export default function EmployeeWorkStation() {
       notes: inlineNotes.trim() || (isPending ? 'Ropa dejada / Paga al retirar' : 'Cargado directamente en mostrador')
     });
 
-    setInlineSuccessToast(`✅ ¡Cliente "${inlineClientName.trim()}" registrado en el cuaderno por $${numUSD.toFixed(2)} USD!`);
+    setInlineSuccessToast(`✅ "${inlineClientName.trim()}" registrado · $${numUSD.toFixed(2)} USD ≈ Bs. ${numBs.toLocaleString('es-VE', {minimumFractionDigits:2})}`);
     setTimeout(() => setInlineSuccessToast(''), 4000);
 
     setInlineClientName('');
@@ -427,63 +447,115 @@ export default function EmployeeWorkStation() {
     return true;
   });
 
-  // Estadísticas del Cierre Diario de la fecha seleccionada
-  const totalCobradoUSD = recordsOfSelectedDate.reduce((acc, r) => acc + (r.amountPaidUSD || 0), 0);
-  const totalCobradoBs = recordsOfSelectedDate.reduce((acc, r) => acc + (r.amountPaidBs || 0), 0);
+  // ====== ESTADÍSTICAS DEL CIERRE DIARIO ======
+  const rate = exchangeRate || 40.50;
 
-  const pagoMovilRecords = recordsOfSelectedDate.filter(r => r.paymentMethod === 'pago_movil' || r.paymentMethod === 'transfer');
-  const totalPagoMovilUSD = pagoMovilRecords.reduce((acc, r) => acc + (r.amountPaidUSD || 0), 0);
-  const totalPagoMovilBs = pagoMovilRecords.reduce((acc, r) => acc + (r.amountPaidBs || 0), 0);
+  // Cierre existente para la fecha seleccionada
+  const existingClosure = dailyClosures.find(c => c.date === selectedDate);
+  const isDayClosed = !!(existingClosure?.isClosed);
 
-  const efectivoUSDRecords = recordsOfSelectedDate.filter(r => r.paymentMethod === 'usd_cash');
-  const totalEfectivoUSD = efectivoUSDRecords.reduce((acc, r) => acc + (r.amountPaidUSD || 0), 0);
+  // Ropa nueva del día seleccionado (creada en selectedDate) que ya pagó
+  const newDayRecords = recordsOfSelectedDate.filter(r => r.paymentStatus === 'paid' || r.paymentStatus === 'partial');
+  const newDayPagoMovil = newDayRecords.filter(r => r.paymentMethod === 'pago_movil' || r.paymentMethod === 'transfer');
+  const newDayEfectivoUSD = newDayRecords.filter(r => r.paymentMethod === 'usd_cash');
+  const newDayEfectivoBs  = newDayRecords.filter(r => r.paymentMethod === 'bs_cash');
 
-  const efectivoBsRecords = recordsOfSelectedDate.filter(r => r.paymentMethod === 'bs_cash');
-  const totalEfectivoBs = efectivoBsRecords.reduce((acc, r) => acc + (r.amountPaidBs || 0), 0);
-  const totalEfectivoBsEnUSD = totalEfectivoBs / (exchangeRate || 40.50);
+  const newPagoMovilBs  = newDayPagoMovil.reduce((a, r) => a + (r.amountPaidBs || 0), 0);
+  const newPagoMovilUSD = newDayPagoMovil.reduce((a, r) => a + (r.amountPaidUSD || 0), 0);
+  const newEfectivoUSD  = newDayEfectivoUSD.reduce((a, r) => a + (r.amountPaidUSD || 0), 0);
+  const newEfectivoBs   = newDayEfectivoBs.reduce((a, r) => a + (r.amountPaidBs || 0), 0);
+  const newTotalUSD     = newDayRecords.reduce((a, r) => a + (r.amountPaidUSD || 0), 0);
+  const newTotalBs      = newDayRecords.reduce((a, r) => a + (r.amountPaidBs || 0), 0);
+  const newPendienteUSD = recordsOfSelectedDate.filter(r => r.paymentStatus === 'pending').reduce((a, r) => a + (r.totalUSD || 0), 0);
 
-  // Guardar cierre diario
-  const handleSaveClosure = (e) => {
-    e.preventDefault();
+  // Ropa del DEPÓSITO (de días anteriores) que fue COBRADA/ENTREGADA HOY
+  // = registros creados ANTES del selectedDate, con paymentDate = selectedDate o deliveredDate = selectedDate
+  const depositoEntregadoHoy = dailyRecords.filter(r => {
+    if (r.date === selectedDate) return false; // solo las de días anteriores
+    const cobradaHoy = r.paymentDate === selectedDate || r.deliveredDate === selectedDate;
+    const fueEntregada = r.deliveryStatus === 'delivered' && (r.deliveredDate === selectedDate);
+    const fuePagada    = r.paymentStatus === 'paid' && r.paymentDate === selectedDate;
+    return cobradaHoy || fueEntregada || fuePagada;
+  });
+  const depPagoMovil  = depositoEntregadoHoy.filter(r => r.paymentMethod === 'pago_movil' || r.paymentMethod === 'transfer');
+  const depEfectivoUSD = depositoEntregadoHoy.filter(r => r.paymentMethod === 'usd_cash');
+  const depEfectivoBs  = depositoEntregadoHoy.filter(r => r.paymentMethod === 'bs_cash');
+  const depPagoMovilBs  = depPagoMovil.reduce((a, r) => a + (r.amountPaidBs || 0), 0);
+  const depPagoMovilUSD = depPagoMovil.reduce((a, r) => a + (r.amountPaidUSD || 0), 0);
+  const depEfUSD        = depEfectivoUSD.reduce((a, r) => a + (r.amountPaidUSD || 0), 0);
+  const depEfBs         = depEfectivoBs.reduce((a, r) => a + (r.amountPaidBs || 0), 0);
+  const depTotalUSD     = depositoEntregadoHoy.reduce((a, r) => a + (r.amountPaidUSD || 0), 0);
+  const depTotalBs      = depositoEntregadoHoy.reduce((a, r) => a + (r.amountPaidBs || 0), 0);
+
+  // PERCIBIDO DEL DÍA = nuevo + depósito cobrado hoy
+  const percibidoTotalUSD = newTotalUSD + depTotalUSD;
+  const percibidoTotalBs  = newTotalBs  + depTotalBs;
+  const percibidoPagoMovilBs  = newPagoMovilBs  + depPagoMovilBs;
+  const percibidoPagoMovilUSD = newPagoMovilUSD + depPagoMovilUSD;
+  const percibidoEfectivoUSD  = newEfectivoUSD  + depEfUSD;
+  const percibidoEfectivoBs   = newEfectivoBs   + depEfBs;
+
+  // legacy compat (para la pestaña closure y WhatsApp)
+  const totalCobradoUSD = newTotalUSD;
+  const totalCobradoBs  = newTotalBs;
+  const totalPagoMovilBs = percibidoPagoMovilBs;
+  const totalPagoMovilUSD = percibidoPagoMovilUSD;
+  const totalEfectivoUSD = percibidoEfectivoUSD;
+  const totalEfectivoBs  = percibidoEfectivoBs;
+  const totalEfectivoBsEnUSD = percibidoEfectivoBs / rate;
+
+  // Handler para confirmar cierre del día
+  const handleConfirmClosure = () => {
     saveDailyClosure({
       date: selectedDate,
-      cobradoBs: totalCobradoBs,
-      cobradoUSD: totalCobradoUSD,
-      pagoMovilBs: totalPagoMovilBs,
-      pagoMovilUSD: totalPagoMovilUSD,
-      efectivoBs: totalEfectivoBs,
-      efectivoUSD: totalEfectivoBsEnUSD,
-      divisasEfectivoUSD: totalEfectivoUSD,
-      fondoInicialBs: parseFloat(fondoInicialBs) || 0,
-      dineroEntregadoBs: parseFloat(dineroEntregadoBs) || 0,
-      dineroEntregadoUSD: parseFloat(dineroEntregadoUSD) || 0,
-      notes: closureNotes.trim(),
-      closedBy: 'Personal LAV'
+      // Ropa nueva del día
+      newCobradoUSD: newTotalUSD,
+      newCobradoBs:  newTotalBs,
+      newPagoMovilBs, newPagoMovilUSD,
+      newEfectivoUSD, newEfectivoBs,
+      newPendienteUSD,
+      newCount: newDayRecords.length,
+      // Depósito cobrado hoy
+      depTotalUSD, depTotalBs,
+      depPagoMovilBs, depPagoMovilUSD,
+      depEfUSD, depEfBs,
+      depCount: depositoEntregadoHoy.length,
+      // Totales percibidos
+      cobradoUSD: percibidoTotalUSD,
+      cobradoBs:  percibidoTotalBs,
+      pagoMovilBs:  percibidoPagoMovilBs,
+      pagoMovilUSD: percibidoPagoMovilUSD,
+      divisasEfectivoUSD: percibidoEfectivoUSD,
+      efectivoBs: percibidoEfectivoBs,
+      efectivoUSD: percibidoEfectivoBs / rate,
+      notes: closureConfirmNotes.trim(),
+      closedBy: 'Personal LAV',
+      closedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
-    setClosureSuccessAlert(true);
-    setTimeout(() => setClosureSuccessAlert(false), 4000);
+    setClosureModalOpen(false);
+    setClosureConfirmNotes('');
   };
 
   // Generar mensaje de WhatsApp para el cierre del día
   const generateClosureWhatsApp = () => {
     const lines = [];
-    lines.push(`🧼 *CIERRE DE CAJA DIARIO - LAVANDERÍA AJ*`);
+    lines.push('🧼 *CIERRE DE CAJA - LAVANDERÍA AJ*');
     lines.push(`📅 *Fecha:* ${selectedDate}`);
-    lines.push(`🕒 *Generado:* ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
-    lines.push('----------------------------------------');
-    lines.push(`💵 *Total Cobrado USD:* $${totalCobradoUSD.toFixed(2)}`);
-    lines.push(`🇻🇪 *Total Cobrado Bs:* Bs. ${totalCobradoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`);
+    lines.push(`🕒 *Hora:* ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+    lines.push('────────────────────────');
+    lines.push(`📋 *Ropa del Día (${newDayRecords.length} servicios):* $${newTotalUSD.toFixed(2)} USD`);
+    if (depositoEntregadoHoy.length > 0)
+      lines.push(`🏪 *Depósito Cobrado Hoy (${depositoEntregadoHoy.length}):* $${depTotalUSD.toFixed(2)} USD`);
+    lines.push('────────────────────────');
+    lines.push(`📲 *Pago Móvil:* Bs. ${percibidoPagoMovilBs.toLocaleString('es-VE')} ($${percibidoPagoMovilUSD.toFixed(2)})`);
+    lines.push(`💵 *Divisas Efectivo:* $${percibidoEfectivoUSD.toFixed(2)}`);
+    lines.push(`🇻🇪 *Efectivo Bs:* Bs. ${percibidoEfectivoBs.toLocaleString('es-VE')} ($${(percibidoEfectivoBs/rate).toFixed(2)})`);
+    lines.push('────────────────────────');
+    lines.push(`✅ *TOTAL PERCIBIDO:* $${percibidoTotalUSD.toFixed(2)} USD`);
+    lines.push(`   Bs. ${percibidoTotalBs.toLocaleString('es-VE')}`);
+    if (closureConfirmNotes) lines.push(`📝 *Nota:* ${closureConfirmNotes}`);
     lines.push('');
-    lines.push(`📲 *Pago Móvil:* Bs. ${totalPagoMovilBs.toLocaleString('es-VE')} ($${totalPagoMovilUSD.toFixed(2)})`);
-    lines.push(`💵 *Efectivo Divisas ($):* $${totalEfectivoUSD.toFixed(2)} USD`);
-    lines.push(`💵 *Efectivo Bolívares:* Bs. ${totalEfectivoBs.toLocaleString('es-VE')} ($${totalEfectivoBsEnUSD.toFixed(2)})`);
-    lines.push('');
-    lines.push(`🏦 *Fondo Recibido:* Bs. ${parseFloat(fondoInicialBs || 0).toLocaleString('es-VE')}`);
-    lines.push(`🤝 *Dinero Entregado:* Bs. ${parseFloat(dineroEntregadoBs || 0).toLocaleString('es-VE')} y $${parseFloat(dineroEntregadoUSD || 0).toFixed(2)} USD`);
-    if (closureNotes) lines.push(`📝 *Notas:* ${closureNotes}`);
-    lines.push('');
-    lines.push('Enviado desde el Sistema PWA Oficial - Lavandería AJ (Personal LAV)');
-
+    lines.push('Sistema PWA - Lavandería AJ');
     return encodeURIComponent(lines.join('\n'));
   };
 
@@ -698,23 +770,41 @@ export default function EmployeeWorkStation() {
                   />
                 </div>
 
-                {/* 3. Monto Designado */}
+                {/* 3. Monto con toggle $ / Bs */}
                 <div>
-                  <label className="block text-[11px] font-bold text-blue-900 mb-1">
-                    Monto Designado ($ USD) *:
+                  <label className="block text-[11px] font-bold mb-1" style={{color: inlineCurrencyMode === 'BS' ? '#854d0e' : '#1e3a8a'}}>
+                    Monto {inlineCurrencyMode === 'BS' ? 'en Bs.' : 'en $ USD'} *:
                   </label>
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    value={inlineAmountUSD}
-                    onChange={(e) => setInlineAmountUSD(e.target.value)}
-                    placeholder="7.50"
-                    className="w-full px-3 py-2 rounded-xl border border-blue-300 text-xs font-mono font-black text-blue-950 bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <span className="text-[10px] text-blue-700 font-semibold block mt-0.5">
-                    ≈ Bs. {((parseFloat(inlineAmountUSD) || 0) * (exchangeRate || 855.66)).toLocaleString('es-VE', { minimumFractionDigits: 2 })} <span className="text-slate-400 font-normal lowercase select-none">+ iva</span>
-                  </span>
+                  <div className="flex gap-1">
+                    {/* Toggle moneda */}
+                    <button
+                      type="button"
+                      onClick={() => { setInlineCurrencyMode(inlineCurrencyMode === 'USD' ? 'BS' : 'USD'); setInlineAmountUSD(''); }}
+                      className={`px-2 py-2 rounded-xl text-xs font-black border shrink-0 transition-all ${inlineCurrencyMode === 'USD' ? 'bg-blue-600 text-white border-blue-600' : 'bg-amber-500 text-white border-amber-500'}`}
+                      title="Cambiar moneda de entrada"
+                    >
+                      {inlineCurrencyMode === 'USD' ? '$' : 'Bs'}
+                    </button>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={inlineAmountUSD}
+                      onChange={(e) => setInlineAmountUSD(e.target.value)}
+                      placeholder={inlineCurrencyMode === 'BS' ? 'Ej: 6420' : '7.50'}
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-mono font-black focus:outline-none focus:ring-2 ${inlineCurrencyMode === 'BS' ? 'border border-amber-400 bg-amber-50/40 text-amber-950 focus:ring-amber-400' : 'border border-blue-300 bg-blue-50/40 text-blue-950 focus:ring-blue-500'}`}
+                    />
+                  </div>
+                  {/* Conversión automática */}
+                  {inlineCurrencyMode === 'USD' ? (
+                    <span className="text-[10px] text-blue-700 font-semibold block mt-0.5">
+                      ≈ Bs. {((parseFloat(inlineAmountUSD) || 0) * (exchangeRate || 1)).toLocaleString('es-VE', { minimumFractionDigits: 2 })} <span className="text-slate-400 font-normal lowercase select-none">+ iva</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-amber-700 font-semibold block mt-0.5">
+                      ≈ $ {((parseFloat(inlineAmountUSD) || 0) / (exchangeRate || 1)).toFixed(2)} USD <span className="text-slate-400 font-normal lowercase select-none">+ iva</span>
+                    </span>
+                  )}
                 </div>
 
                 {/* 4. Forma de Pago */}
@@ -835,6 +925,55 @@ export default function EmployeeWorkStation() {
             </form>
           </div>
           
+          {/* ── BANNER: DÍA CERRADO ── */}
+          {isDayClosed && !postClosureUnlocked && (
+            <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-300 shadow-xs">
+              <div className="flex items-center gap-2 text-emerald-800">
+                <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
+                <div>
+                  <p className="text-xs font-black">Cierre del {selectedDate} confirmado</p>
+                  <p className="text-[11px] text-emerald-700">Para añadir o editar algo, introduce la clave de administrador.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setPostClosureUnlockOpen(true); setPostClosurePassword(''); setPostClosureError(''); }}
+                className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs flex items-center gap-1.5 shrink-0"
+              >
+                <Lock size={13} /> Desbloquear
+              </button>
+            </div>
+          )}
+          {isDayClosed && postClosureUnlocked && (
+            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold flex items-center gap-2">
+              <ShieldAlert size={16} className="text-amber-600 shrink-0" />
+              <span>Edición desbloqueada temporalmente. El cierre se recalculará si haces cambios.</span>
+              <button type="button" onClick={() => setPostClosureUnlocked(false)} className="ml-auto text-amber-600 hover:text-amber-800 underline text-[11px]">Volver a bloquear</button>
+            </div>
+          )}
+
+          {/* ── BOTÓN HACER CIERRE DEL DÍA ── */}
+          {!isDayClosed && (
+            <button
+              type="button"
+              onClick={() => setClosureModalOpen(true)}
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white font-extrabold text-sm shadow-lg flex items-center justify-center gap-2.5 transition-all active:scale-[0.99]"
+            >
+              <DollarSign size={18} />
+              <span>🔒 Hacer Cierre del Día · {selectedDate}</span>
+            </button>
+          )}
+          {isDayClosed && (
+            <button
+              type="button"
+              onClick={() => setClosureModalOpen(true)}
+              className="w-full py-2.5 rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition-all"
+            >
+              <CheckCircle2 size={16} />
+              <span>Ver Resumen del Cierre · {selectedDate}</span>
+            </button>
+          )}
+
           {/* Barra de Filtros de Fecha, Origen y Búsqueda */}
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-blue-100 shadow-xs">
             <div className="flex flex-wrap items-center gap-3">
@@ -1991,6 +2130,249 @@ export default function EmployeeWorkStation() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════
+          MODAL: HACER CIERRE DEL DÍA
+      ══════════════════════════════════════════════════ */}
+      {closureModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-3 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-blue-200 my-4 overflow-hidden">
+
+            {/* Header */}
+            <div className="bg-gradient-to-r from-slate-800 to-blue-900 px-5 py-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-white text-base flex items-center gap-2">
+                  <DollarSign size={18} className="text-cyan-300" />
+                  {isDayClosed ? 'Resumen del Cierre' : 'Hacer Cierre del Día'}
+                </h3>
+                <p className="text-xs text-blue-300 mt-0.5">📅 {selectedDate} · {new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+              </div>
+              <button onClick={() => setClosureModalOpen(false)} className="p-1.5 rounded-xl text-white/60 hover:text-white hover:bg-white/10">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+
+              {/* ── SECCIÓN 1: ROPA DEL DÍA ── */}
+              <div className="rounded-2xl border border-blue-200 overflow-hidden">
+                <div className="bg-blue-50 px-4 py-2 flex items-center justify-between">
+                  <span className="text-xs font-black text-blue-900">📋 Ropa Trabajada Hoy ({newDayRecords.length} servicios)</span>
+                  <span className="text-xs font-black text-blue-800 font-mono">${newTotalUSD.toFixed(2)} USD</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {/* Pago Móvil */}
+                  <div className="flex items-center justify-between px-4 py-2 text-xs">
+                    <span className="text-slate-600 flex items-center gap-1.5"><span className="text-base">📱</span> Pago Móvil / Transferencia</span>
+                    <div className="text-right">
+                      <p className="font-black text-slate-900 font-mono">Bs. {newPagoMovilBs.toLocaleString('es-VE', {minimumFractionDigits:2})}</p>
+                      <p className="text-[10px] text-slate-500 font-mono">(${newPagoMovilUSD.toFixed(2)} USD)</p>
+                    </div>
+                  </div>
+                  {/* Divisas */}
+                  <div className="flex items-center justify-between px-4 py-2 text-xs">
+                    <span className="text-slate-600 flex items-center gap-1.5"><span className="text-base">💵</span> Divisas / Efectivo USD ($)</span>
+                    <div className="text-right">
+                      <p className="font-black text-slate-900 font-mono">${newEfectivoUSD.toFixed(2)} USD</p>
+                    </div>
+                  </div>
+                  {/* Efectivo Bs */}
+                  <div className="flex items-center justify-between px-4 py-2 text-xs">
+                    <span className="text-slate-600 flex items-center gap-1.5"><span className="text-base">🇻🇪</span> Efectivo Bolívares</span>
+                    <div className="text-right">
+                      <p className="font-black text-slate-900 font-mono">Bs. {newEfectivoBs.toLocaleString('es-VE', {minimumFractionDigits:2})}</p>
+                      <p className="text-[10px] text-slate-500 font-mono">(${(newEfectivoBs / (exchangeRate||1)).toFixed(2)} USD)</p>
+                    </div>
+                  </div>
+                  {/* Pendiente */}
+                  {newPendienteUSD > 0 && (
+                    <div className="flex items-center justify-between px-4 py-2 text-xs bg-amber-50">
+                      <span className="text-amber-700 flex items-center gap-1.5"><span className="text-base">⏳</span> Ropa Dejada / Por Cobrar</span>
+                      <p className="font-black text-amber-800 font-mono">${newPendienteUSD.toFixed(2)} USD</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── SECCIÓN 2: DEPÓSITO COBRADO HOY ── */}
+              <div className="rounded-2xl border border-amber-200 overflow-hidden">
+                <div className="bg-amber-50 px-4 py-2 flex items-center justify-between">
+                  <span className="text-xs font-black text-amber-900">🏪 Ropa del Depósito Cobrada Hoy ({depositoEntregadoHoy.length})</span>
+                  <span className="text-xs font-black text-amber-800 font-mono">${depTotalUSD.toFixed(2)} USD</span>
+                </div>
+                {depositoEntregadoHoy.length === 0 ? (
+                  <p className="px-4 py-3 text-xs text-slate-400 italic">Sin cobros de depósito registrados hoy.</p>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {depositoEntregadoHoy.map(r => (
+                      <div key={r.id} className="flex items-center justify-between px-4 py-2 text-xs">
+                        <div>
+                          <p className="font-bold text-slate-900">{r.customerName}</p>
+                          <p className="text-[10px] text-slate-500">{r.date} → cobrado hoy · {r.paymentMethod === 'pago_movil' ? '📱 PM' : r.paymentMethod === 'usd_cash' ? '💵 $' : '🇻🇪 Bs'}</p>
+                        </div>
+                        <span className="font-black font-mono text-amber-800">${(r.amountPaidUSD||0).toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between px-4 py-2 text-xs bg-amber-50/50">
+                      <span className="text-amber-700">📱 Pago Móvil depósito</span>
+                      <span className="font-mono font-bold text-amber-800">Bs. {depPagoMovilBs.toLocaleString('es-VE')} (${depPagoMovilUSD.toFixed(2)})</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-2 text-xs bg-amber-50/50">
+                      <span className="text-amber-700">💵 Divisas depósito</span>
+                      <span className="font-mono font-bold text-amber-800">${depEfUSD.toFixed(2)} USD</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-2 text-xs bg-amber-50/50">
+                      <span className="text-amber-700">🇻🇪 Efectivo Bs. depósito</span>
+                      <span className="font-mono font-bold text-amber-800">Bs. {depEfBs.toLocaleString('es-VE')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── SECCIÓN 3: TOTAL PERCIBIDO DEL DÍA ── */}
+              <div className="rounded-2xl border-2 border-slate-800 overflow-hidden">
+                <div className="bg-slate-800 px-4 py-2.5">
+                  <p className="text-xs font-black text-cyan-300 uppercase tracking-wide">✅ Total Percibido del Día</p>
+                  <p className="text-[11px] text-slate-400">Ropa nueva + Depósito cobrado hoy</p>
+                </div>
+                <div className="bg-slate-50 p-4 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-bold text-slate-700">📱 Pago Móvil</span>
+                    <div className="text-right">
+                      <p className="font-black text-slate-900 font-mono">Bs. {percibidoPagoMovilBs.toLocaleString('es-VE', {minimumFractionDigits:2})}</p>
+                      <p className="text-[11px] text-slate-500 font-mono">(${percibidoPagoMovilUSD.toFixed(2)})</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-bold text-slate-700">💵 Divisas $</span>
+                    <p className="font-black text-slate-900 font-mono">${percibidoEfectivoUSD.toFixed(2)} USD</p>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-bold text-slate-700">🇻🇪 Efectivo Bs.</span>
+                    <div className="text-right">
+                      <p className="font-black text-slate-900 font-mono">Bs. {percibidoEfectivoBs.toLocaleString('es-VE', {minimumFractionDigits:2})}</p>
+                      <p className="text-[11px] text-slate-500 font-mono">(${(percibidoEfectivoBs / (exchangeRate||1)).toFixed(2)})</p>
+                    </div>
+                  </div>
+                  <div className="border-t-2 border-slate-300 pt-2 flex items-center justify-between">
+                    <span className="font-black text-slate-900 text-base">TOTAL</span>
+                    <div className="text-right">
+                      <p className="font-black text-blue-900 text-xl font-mono">${percibidoTotalUSD.toFixed(2)} USD</p>
+                      <p className="text-xs text-slate-600 font-mono">Bs. {percibidoTotalBs.toLocaleString('es-VE', {minimumFractionDigits:2})}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── NOTAS Y ACCIONES ── */}
+              {!isDayClosed && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Observaciones del cierre (opcional):</label>
+                  <input
+                    type="text"
+                    value={closureConfirmNotes}
+                    onChange={e => setClosureConfirmNotes(e.target.value)}
+                    placeholder="Ej: Todo cuadrado. Sin novedad."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                {/* WhatsApp */}
+                <a
+                  href={`https://wa.me/584126701633?text=${generateClosureWhatsApp()}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-sm"
+                >
+                  <Share2 size={14} /> Enviar por WhatsApp
+                </a>
+
+                {!isDayClosed && (
+                  <button
+                    type="button"
+                    onClick={handleConfirmClosure}
+                    className="flex-1 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-600 text-white font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                  >
+                    <CheckCircle2 size={16} /> Confirmar Cierre del Día
+                  </button>
+                )}
+                {isDayClosed && (
+                  <div className="flex-1 py-2.5 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 font-extrabold text-xs text-center">
+                    ✅ Cierre ya confirmado · {existingClosure?.closedAt}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════
+          MODAL: DESBLOQUEAR POST-CIERRE (CLAVE)
+      ══════════════════════════════════════════════════ */}
+      {postClosureUnlockOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 border border-amber-300 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center">
+                <Lock size={20} className="text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 text-base">Desbloquear Cierre</h3>
+                <p className="text-[11px] text-slate-500">Ingresa la clave de administrador para permitir ediciones post-cierre.</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <input
+                type="password"
+                autoFocus
+                value={postClosurePassword}
+                onChange={e => setPostClosurePassword(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    if (verifyAdminPassword(postClosurePassword)) {
+                      setPostClosureUnlocked(true);
+                      setPostClosureUnlockOpen(false);
+                      setPostClosureError('');
+                    } else {
+                      setPostClosureError('Clave incorrecta. Inténtalo de nuevo.');
+                    }
+                  }
+                }}
+                placeholder="Ingresa clave maestra (ej: aj2026)"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-mono text-center tracking-widest text-slate-900 focus:outline-none focus:border-amber-500"
+              />
+              {postClosureError && (
+                <p className="text-xs font-bold text-red-600 text-center">{postClosureError}</p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPostClosureUnlockOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50"
+                >Cancelar</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (verifyAdminPassword(postClosurePassword)) {
+                      setPostClosureUnlocked(true);
+                      setPostClosureUnlockOpen(false);
+                      setPostClosureError('');
+                    } else {
+                      setPostClosureError('Clave incorrecta. Inténtalo de nuevo.');
+                    }
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs shadow-sm"
+                >Desbloquear</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
