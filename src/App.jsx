@@ -31,15 +31,36 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200 text-slate-800 my-4 text-center">
-          <h3 className="font-black text-base text-amber-900 mb-1">Actualizando vista...</h3>
-          <p className="text-xs text-slate-600 mb-3">Presiona para restaurar el estado:</p>
-          <button
-            onClick={() => this.setState({ hasError: false })}
-            className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold shadow hover:bg-blue-700 transition-colors"
-          >
-            Recargar Simulador
-          </button>
+        <div className="min-h-screen bg-[#EEF5FB] flex items-center justify-center p-6 text-slate-800 text-center">
+          <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-blue-200 shadow-xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl mx-auto">
+              ⚠️
+            </div>
+            <h3 className="font-black text-lg text-slate-900">Restaurando Conexión...</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              {this.state.error?.message || 'El sistema está sincronizando la base de datos.'}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false });
+                  window.location.reload();
+                }}
+                className="flex-1 px-4 py-3 rounded-xl bg-blue-600 text-white text-xs font-black shadow hover:bg-blue-700 transition-colors"
+              >
+                Recargar Sistema
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('aj_firebase_config');
+                  window.location.reload();
+                }}
+                className="px-4 py-3 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition-colors"
+              >
+                Volver a Modo Local
+              </button>
+            </div>
+          </div>
         </div>
       );
     }
@@ -141,7 +162,8 @@ export default function App() {
   };
 
   return (
-    <AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
       <div className="min-h-screen bg-[#EEF5FB] text-slate-900 flex flex-col justify-between selection:bg-blue-500 selection:text-white">
         
         {/* Alerta de Sincronización Mágica o Error de Reglas */}
@@ -393,5 +415,6 @@ export default function App() {
         )}
       </div>
     </AppProvider>
+    </ErrorBoundary>
   );
 }
