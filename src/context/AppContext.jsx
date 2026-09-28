@@ -1,4 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  initFirebase, 
+  getFirebaseConfig, 
+  syncDocToCloud, 
+  deleteDocFromCloud, 
+  subscribeToCollection 
+} from '../services/firebase';
 
 const AppContext = createContext();
 
@@ -30,6 +37,79 @@ const DEFAULT_MACHINES = [
 ];
 
 export function AppProvider({ children }) {
+  // Estado de sincronización en la Nube (Firebase)
+  const [isCloudConnected, setIsCloudConnected] = useState(() => !!getFirebaseConfig());
+
+  // Suscripciones en tiempo real a la nube
+  useEffect(() => {
+    const config = getFirebaseConfig();
+    if (!config) {
+      setIsCloudConnected(false);
+      return;
+    }
+
+    const { isConfigured } = initFirebase();
+    setIsCloudConnected(isConfigured);
+
+    if (isConfigured) {
+      // 1. Sincronización en vivo del Cuaderno Diario
+      const unsubDaily = subscribeToCollection('daily_records', (cloudRecords) => {
+        if (cloudRecords && cloudRecords.length > 0) {
+          setDailyRecords(prev => {
+            const map = new Map(prev.map(r => [r.id, r]));
+            cloudRecords.forEach(cr => map.set(cr.id, cr));
+            const merged = Array.from(map.values()).sort((a, b) => {
+              const dateA = (a.date || '') + ' ' + (a.time || '');
+              const dateB = (b.date || '') + ' ' + (b.time || '');
+              return dateB.localeCompare(dateA);
+            });
+            return merged;
+          });
+        }
+      });
+
+      // 2. Sincronización en vivo de Cierres Diarios
+      const unsubClosures = subscribeToCollection('daily_closures', (cloudClosures) => {
+        if (cloudClosures && cloudClosures.length > 0) {
+          setDailyClosures(prev => {
+            const map = new Map(prev.map(c => [c.date, c]));
+            cloudClosures.forEach(cc => map.set(cc.date, cc));
+            return Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+          });
+        }
+      });
+
+      // 3. Sincronización de Insumos / Detergentes
+      const unsubDetergents = subscribeToCollection('detergent_logs', (cloudLogs) => {
+        if (cloudLogs && cloudLogs.length > 0) {
+          setDetergentLogs(prev => {
+            const map = new Map(prev.map(d => [d.id, d]));
+            cloudLogs.forEach(cd => map.set(cd.id, cd));
+            return Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+          });
+        }
+      });
+
+      // 4. Sincronización de Gastos
+      const unsubExpenses = subscribeToCollection('expenses', (cloudExp) => {
+        if (cloudExp && cloudExp.length > 0) {
+          setExpenses(prev => {
+            const map = new Map(prev.map(e => [e.id, e]));
+            cloudExp.forEach(ce => map.set(ce.id, ce));
+            return Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+          });
+        }
+      });
+
+      return () => {
+        unsubDaily();
+        unsubClosures();
+        unsubDetergents();
+        unsubExpenses();
+      };
+    }
+  }, [isCloudConnected]);
+
   // Configuración general de tasas (USD y EUR oficiales del BCV)
   const [exchangeRate, setExchangeRate] = useState(() => {
     const saved = localStorage.getItem('aj_exchange_rate');
@@ -590,11 +670,21 @@ export function AppProvider({ children }) {
       }
     }
 
+    // Sincronizar de inmediato a la nube
+    syncDocToCloud('daily_records', record.id, record);
+    syncDocToCloud('orders', orderFormat.id, orderFormat);
+
     return record;
   };
 
   const updateDailyRecord = (id, updatedFields) => {
-    setDailyRecords(prev => prev.map(r => r.id === id ? { ...r, ...updatedFields } : r));
+    setDailyRecords(prev => {
+      const target = prev.find(r => r.id === id);
+      if (target) {
+        syncDocToCloud('daily_records', id, { ...target, ...updatedFields });
+      }
+      return prev.map(r => r.id === id ? { ...r, ...updatedFields } : r);
+    });
 
     // Sincronizar en órdenes
     setOrders(prev => prev.map(o => {
@@ -611,11 +701,17 @@ export function AppProvider({ children }) {
 
   const markRecordDelivered = (id, deliveredDate) => {
     const today = deliveredDate || new Date().toISOString().split('T')[0];
-    setDailyRecords(prev => prev.map(r => r.id === id ? { 
-      ...r, 
-      deliveryStatus: 'delivered',
-      deliveredDate: today
-    } : r));
+    setDailyRecords(prev => {
+      const target = prev.find(r => r.id === id);
+      if (target) {
+        syncDocToCloud('daily_records', id, { ...target, deliveryStatus: 'delivered', deliveredDate: today });
+      }
+      return prev.map(r => r.id === id ? { 
+        ...r, 
+        deliveryStatus: 'delivered',
+        deliveredDate: today
+      } : r);
+    });
 
     // Sincronizar en órdenes para que Administración lo vea entregado
     setOrders(prev => prev.map(o => (o.id === id || o.originalId === id || o.id === `AJ-${id.replace('rec_', '')}`) ? {
@@ -628,22 +724,39 @@ export function AppProvider({ children }) {
 
   const markRecordPaid = (id, paymentData = {}) => {
     const paymentDate = paymentData.paymentDate || new Date().toISOString().split('T')[0];
-    setDailyRecords(prev => prev.map(r => {
-      if (r.id === id) {
-        return {
-          ...r,
+    setDailyRecords(prev => {
+      const target = prev.find(r => r.id === id);
+      if (target) {
+        const updated = {
+          ...target,
           paymentStatus: 'paid',
-          amountPaidUSD: r.totalUSD,
-          amountPaidBs: r.totalBs,
+          amountPaidUSD: target.totalUSD,
+          amountPaidBs: target.totalBs,
           debtUSD: 0,
           paymentDate: paymentDate,
-          paymentMethod: paymentData.paymentMethod || r.paymentMethod || 'usd_cash',
-          bankReference: paymentData.bankReference || r.bankReference || 'Pagado en mostrador',
-          notes: paymentData.notes ? `${r.notes ? r.notes + ' · ' : ''}${paymentData.notes}` : r.notes
+          paymentMethod: paymentData.paymentMethod || target.paymentMethod || 'usd_cash',
+          bankReference: paymentData.bankReference || target.bankReference || 'Pagado en mostrador',
+          notes: paymentData.notes ? `${target.notes ? target.notes + ' · ' : ''}${paymentData.notes}` : target.notes
         };
+        syncDocToCloud('daily_records', id, updated);
       }
-      return r;
-    }));
+      return prev.map(r => {
+        if (r.id === id) {
+          return {
+            ...r,
+            paymentStatus: 'paid',
+            amountPaidUSD: r.totalUSD,
+            amountPaidBs: r.totalBs,
+            debtUSD: 0,
+            paymentDate: paymentDate,
+            paymentMethod: paymentData.paymentMethod || r.paymentMethod || 'usd_cash',
+            bankReference: paymentData.bankReference || r.bankReference || 'Pagado en mostrador',
+            notes: paymentData.notes ? `${r.notes ? r.notes + ' · ' : ''}${paymentData.notes}` : r.notes
+          };
+        }
+        return r;
+      });
+    });
 
     // Sincronizar en órdenes para que Administración registre el pago
     setOrders(prev => prev.map(o => (o.id === id || o.originalId === id || o.id === `AJ-${id.replace('rec_', '')}`) ? {
@@ -710,6 +823,8 @@ export function AppProvider({ children }) {
       }
     });
 
+    deleteDocFromCloud('daily_records', id);
+    deleteDocFromCloud('orders', `AJ-${id.replace('rec_', '')}`);
     setDailyRecords(prev => prev.filter(r => r.id !== id));
     setOrders(prev => prev.filter(o => o.id !== id && o.originalId !== id && o.id !== `AJ-${id.replace('rec_', '')}`));
 
@@ -749,6 +864,7 @@ export function AppProvider({ children }) {
       }
       return [newClosure, ...prev];
     });
+    syncDocToCloud('daily_closures', newClosure.date, newClosure);
     return newClosure;
   };
 
@@ -785,7 +901,10 @@ export function AppProvider({ children }) {
       deleteRecordWithAudit,
       logAuditAction,
       addDetergentLog,
-      saveDailyClosure
+      saveDailyClosure,
+      isCloudConnected,
+      setIsCloudConnected,
+      getFirebaseConfig
     }}>
       {children}
     </AppContext.Provider>

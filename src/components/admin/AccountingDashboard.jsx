@@ -12,8 +12,14 @@ export default function AccountingDashboard() {
   const { 
     orders, expenses, exchangeRate, setExchangeRate, 
     updateOrderStatus, updatePaymentStatus, addExpense,
-    auditLogs, dailyClosures, detergentLogs, dailyRecords
+    auditLogs, dailyClosures, detergentLogs, dailyRecords,
+    isCloudConnected, setIsCloudConnected
   } = useApp();
+
+  const [showCloudModal, setShowCloudModal] = useState(false);
+  const [firebaseConfigInput, setFirebaseConfigInput] = useState('');
+  const [cloudSyncStatusMsg, setCloudSyncStatusMsg] = useState('');
+  const [isUploadingLocal, setIsUploadingLocal] = useState(false);
 
   const [adminTab, setAdminTab] = useState('metrics'); // 'metrics' | 'audit' | 'closures' | 'supplies'
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -174,6 +180,21 @@ export default function AccountingDashboard() {
               Histórico
             </button>
           </div>
+
+          {/* Cloud Sync Button */}
+          <button
+            type="button"
+            onClick={() => setShowCloudModal(true)}
+            className={`px-3.5 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all border shadow-xs ${
+              isCloudConnected 
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100' 
+                : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 animate-pulse'
+            }`}
+            title="Conexión en la nube para sincronizar laptops y teléfonos en tiempo real"
+          >
+            <span className="text-base">{isCloudConnected ? '☁️' : '⚠️'}</span>
+            <span>{isCloudConnected ? 'Nube Activa (En Vivo)' : 'Sincronizar Teléfonos'}</span>
+          </button>
 
           {/* New Ticket Button */}
           <button
@@ -397,11 +418,11 @@ export default function AccountingDashboard() {
                 <table className="w-full text-left text-xs min-w-[640px]">
                   <thead className="bg-slate-50 text-slate-500 font-mono uppercase text-[11px] border-b border-slate-100">
                     <tr>
-                      <th className="py-3 px-4">Ticket</th>
+                      <th className="py-3 px-4">Ticket / Hora</th>
                       <th className="py-3 px-4">Cliente / Contacto</th>
                       <th className="py-3 px-4">Servicio</th>
                       <th className="py-3 px-4 text-right">Total ($ USD)</th>
-                      <th className="py-3 px-4 text-center">Pago</th>
+                      <th className="py-3 px-4 text-center">Forma de Pago</th>
                       <th className="py-3 px-4 text-center">Estado Ropa</th>
                       <th className="py-3 px-4 text-center">WhatsApp</th>
                     </tr>
@@ -409,12 +430,20 @@ export default function AccountingDashboard() {
                   <tbody className="divide-y divide-slate-100">
                     {filteredOrders.map((order) => (
                       <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3 px-4 font-mono font-bold text-blue-600">
-                          #{order.id}
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className="font-mono font-bold text-blue-600 text-xs block">
+                            #{order.id}
+                          </span>
+                          <span className="font-mono text-[11px] font-bold text-slate-700 block mt-0.5">
+                            🕒 {order.time || '--:--'}
+                          </span>
+                          <span className="font-mono text-[10px] text-slate-400 block">
+                            {order.date}
+                          </span>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-slate-900">{order.customerName}</span>
+                            <span className="font-bold text-slate-900 text-sm">{order.customerName}</span>
                             {order.origin === 'walk_in' || order.origin === 'counter' ? (
                               <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-bold border border-slate-200">
                                 🏢 Mostrador
@@ -425,23 +454,54 @@ export default function AccountingDashboard() {
                               </span>
                             ) : null}
                           </div>
-                          <div className="text-[11px] text-slate-400 font-mono">{order.customerPhone}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">{order.customerPhone}</div>
                           {order.notes && <div className="text-[10px] text-amber-700 italic max-w-xs truncate">{order.notes}</div>}
                         </td>
                         <td className="py-3 px-4 text-slate-700 font-medium">
                           {order.itemsSummary}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-black text-slate-900">
-                          ${order.totalUSD.toFixed(2)}
+                        <td className="py-3 px-4 text-right font-mono font-black text-slate-900 text-sm whitespace-nowrap">
+                          <div>${order.totalUSD.toFixed(2)}</div>
+                          <div className="text-[10px] text-slate-500 font-normal">
+                            ≈ Bs. {(order.totalBs || (order.totalUSD * (exchangeRate || 1))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                          </div>
                         </td>
-                        <td className="py-3 px-4 text-center">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                            order.paymentStatus === 'paid' 
-                              ? 'bg-emerald-100 text-emerald-800' 
-                              : 'bg-amber-100 text-amber-800'
-                          }`}>
-                            {order.paymentStatus === 'paid' ? 'Pagado' : 'Por Cobrar'}
-                          </span>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          {order.paymentStatus === 'paid' ? (
+                            <div className="space-y-1">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                ✓ Pagado
+                              </span>
+                              <div className="text-[11px] font-bold text-slate-800">
+                                {order.paymentMethod === 'usd_cash' && '💵 Divisa $ (Efectivo)'}
+                                {order.paymentMethod === 'pago_movil' && '📱 Pago Móvil'}
+                                {order.paymentMethod === 'bs_cash' && '🇻🇪 Efectivo Bs.'}
+                                {order.paymentMethod === 'transfer' && '🏦 Transferencia'}
+                                {!['usd_cash', 'pago_movil', 'bs_cash', 'transfer'].includes(order.paymentMethod) && order.paymentMethod}
+                              </div>
+                              {order.bankReference && (
+                                <span className="text-[10px] font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 inline-block max-w-[140px] truncate">
+                                  {order.bankReference}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                order.paymentStatus === 'partial'
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  : 'bg-red-100 text-red-800 border border-red-300'
+                              }`}>
+                                {order.paymentStatus === 'partial' ? '⚠️ Abono Parcial' : '⏳ Por Cobrar'}
+                              </span>
+                              <div className="text-xs font-mono font-black text-red-600">
+                                Debe: ${(order.debtUSD !== undefined && order.debtUSD > 0 ? order.debtUSD : order.totalUSD).toFixed(2)} USD
+                              </div>
+                              <span className="text-[10px] text-slate-400 block">
+                                Paga al retirar
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">
@@ -723,6 +783,184 @@ export default function AccountingDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+            {/* Modal de Conexión en la Nube (Firebase) */}
+      {showCloudModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 border border-blue-200 shadow-2xl space-y-4 my-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-xl">
+                  ☁️
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">
+                    Sincronización en la Nube (Multi-Dispositivo)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Conexión permanente en tiempo real entre laptop y teléfonos
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCloudModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Estado actual de conexión */}
+            <div className={`p-4 rounded-2xl border ${
+              isCloudConnected 
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-900' 
+                : 'bg-amber-50 border-amber-300 text-amber-900'
+            }`}>
+              <div className="flex items-center gap-2 font-black text-sm">
+                <span>{isCloudConnected ? '✅ BASE DE DATOS ACTIVA' : '⚠️ MODO LOCAL (SIN SINCRONIZAR)'}</span>
+              </div>
+              <p className="text-xs mt-1 leading-relaxed">
+                {isCloudConnected 
+                  ? 'Tu sistema está conectado a Google Cloud Firebase. Cada cliente, pago, abono o cierre se actualiza en vivo al instante en cualquier laptop o teléfono conectado.'
+                  : 'Actualmente los datos se guardan solo en la memoria de este navegador. Para que la laptop y el teléfono compartan los mismos datos al segundo, conecta tu proyecto gratuito de Firebase.'}
+              </p>
+            </div>
+
+            {/* Acciones si ya está conectado */}
+            {isCloudConnected && (
+              <div className="space-y-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isUploadingLocal}
+                  onClick={async () => {
+                    setIsUploadingLocal(true);
+                    setCloudSyncStatusMsg('Subiendo registros locales a la nube...');
+                    try {
+                      const { syncDocToCloud } = await import('../../services/firebase');
+                      let count = 0;
+                      for (const r of dailyRecords) {
+                        await syncDocToCloud('daily_records', r.id, r);
+                        count++;
+                      }
+                      for (const o of orders) {
+                        await syncDocToCloud('orders', o.id, o);
+                      }
+                      for (const c of dailyClosures) {
+                        await syncDocToCloud('daily_closures', c.date, c);
+                      }
+                      setCloudSyncStatusMsg(`¡Listo! Se sincronizaron ${count} registros locales a la nube.`);
+                      setTimeout(() => setCloudSyncStatusMsg(''), 4000);
+                    } catch (err) {
+                      setCloudSyncStatusMsg('Error al sincronizar: ' + err.message);
+                    } finally {
+                      setIsUploadingLocal(false);
+                    }
+                  }}
+                  className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs uppercase shadow-sm flex items-center justify-center gap-2 active:scale-95 transition-all"
+                >
+                  <span>{isUploadingLocal ? '⏳ Sincronizando...' : '📤 Subir Todos los Registros de Este Equipo a la Nube'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('¿Deseas desconectar la base de datos de la nube en este dispositivo?')) {
+                      localStorage.removeItem('aj_firebase_config');
+                      setIsCloudConnected(false);
+                      setCloudSyncStatusMsg('Desconectado. Ahora estás en modo local.');
+                    }
+                  }}
+                  className="w-full py-2.5 rounded-xl border border-red-200 text-red-600 font-bold text-xs hover:bg-red-50"
+                >
+                  Desconectar Proyecto de la Nube
+                </button>
+              </div>
+            )}
+
+            {/* Formulario de Configuración si no está conectado */}
+            {!isCloudConnected && (
+              <div className="space-y-3">
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-xs space-y-1 text-slate-700">
+                  <p className="font-bold text-slate-900">¿Cómo activarlo gratis en 2 minutos?</p>
+                  <ol className="list-decimal list-inside space-y-0.5 text-[11px] text-slate-600">
+                    <li>Entra en <strong>console.firebase.google.com</strong> con tu Gmail.</li>
+                    <li>Crea un proyecto (ej: <em>lavanderia-aj</em>) y crea la base de datos <strong>Firestore</strong> en Modo de Prueba.</li>
+                    <li>En Configuración de proyecto &gt; Apps Web, copia el bloque <code>firebaseConfig</code> y pégalo abajo.</li>
+                  </ol>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Pega tu configuración de Firebase aquí:
+                  </label>
+                  <textarea
+                    rows={5}
+                    value={firebaseConfigInput}
+                    onChange={(e) => setFirebaseConfigInput(e.target.value)}
+                    placeholder={'const firebaseConfig = {\n  apiKey: "AIzaSy...",\n  projectId: "lavanderia-aj-...",\n  authDomain: "..."\n};'}
+                    className="w-full p-3 rounded-xl border border-slate-300 font-mono text-xs text-slate-900 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const raw = firebaseConfigInput.trim();
+                    if (!raw) {
+                      alert('Por favor pega la configuración de Firebase.');
+                      return;
+                    }
+
+                    // Extraer los campos con regex flexible
+                    const extract = (key) => {
+                      const match = raw.match(new RegExp(`${key}["']?\s*:\s*["']([^"']+)["']`));
+                      return match ? match[1] : '';
+                    };
+
+                    const apiKey = extract('apiKey');
+                    const projectId = extract('projectId');
+                    const authDomain = extract('authDomain') || `${projectId}.firebaseapp.com`;
+                    const storageBucket = extract('storageBucket') || `${projectId}.appspot.com`;
+                    const messagingSenderId = extract('messagingSenderId') || '';
+                    const appId = extract('appId') || '';
+
+                    if (!apiKey || !projectId) {
+                      alert('No se detectaron apiKey o projectId válidos. Revisa el texto pegado.');
+                      return;
+                    }
+
+                    const configObj = { apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId };
+                    localStorage.setItem('aj_firebase_config', JSON.stringify(configObj));
+
+                    try {
+                      const { initFirebase } = await import('../../services/firebase');
+                      const { isConfigured, error } = initFirebase();
+                      if (isConfigured) {
+                        setIsCloudConnected(true);
+                        setCloudSyncStatusMsg('¡Conexión exitosa! Ahora tus dispositivos se sincronizan en vivo.');
+                        setTimeout(() => setShowCloudModal(false), 2000);
+                      } else {
+                        alert('Error al inicializar Firebase: ' + (error?.message || 'Verifica los datos'));
+                      }
+                    } catch (e) {
+                      alert('Error: ' + e.message);
+                    }
+                  }}
+                  className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all"
+                >
+                  <span>💾 Guardar y Conectar en Vivo</span>
+                </button>
+              </div>
+            )}
+
+            {cloudSyncStatusMsg && (
+              <p className="text-xs font-bold text-center text-blue-700 bg-blue-50 p-2.5 rounded-xl border border-blue-200">
+                {cloudSyncStatusMsg}
+              </p>
+            )}
           </div>
         </div>
       )}
