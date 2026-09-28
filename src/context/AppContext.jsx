@@ -36,6 +36,61 @@ const DEFAULT_MACHINES = [
   { id: 'sec-3', name: 'Secadora Eléctrica #3', type: 'dryer', capacity: '10 kg', status: 'out_of_service', lastService: '2026-08-10', notes: 'Esperando termostato' },
 ];
 
+// Función para asegurar que las cantidades de servicios correspondan fielmente a las cestas
+export function normalizeRecordServices(r) {
+  if (!r) return r;
+  let wash = Number(r.washCount);
+  let dry = Number(r.dryCount);
+  let soap = Number(r.soapCount);
+  let labor = Number(r.laborCount);
+  let softener = Number(r.softenerCount);
+  let bleach = Number(r.bleachCount) || 0;
+  let degreaser = Number(r.degreaserCount) || 0;
+
+  const textToScan = `${r.notes || ''} ${r.customerName || ''}`.toLowerCase();
+  
+  // Buscar si especifica cestas en el texto ("2 cestas", "3 cestas", "2 cesta", etc.)
+  const basketMatch = textToScan.match(/(\d+)\s*cesta/);
+  let detectedBaskets = basketMatch ? parseInt(basketMatch[1], 10) : 0;
+
+  // Si no hay mención en texto pero el totalUSD coincide con múltiplos de combos ($7.50 c/u)
+  if (!detectedBaskets && r.totalUSD) {
+    const num = Number(r.totalUSD);
+    if (Math.abs(num - 15.00) < 0.35) detectedBaskets = 2;
+    else if (Math.abs(num - 22.50) < 0.35) detectedBaskets = 3;
+    else if (Math.abs(num - 30.00) < 0.35) detectedBaskets = 4;
+    else if (Math.abs(num - 37.50) < 0.35) detectedBaskets = 5;
+  }
+
+  // Si se detectaron 2 o más cestas pero en las otras columnas marca 1 (por defecto anterior)
+  if (detectedBaskets > 1) {
+    if (isNaN(wash) || wash <= 1) wash = detectedBaskets;
+    if (isNaN(dry) || dry <= 1) dry = detectedBaskets;
+    if (isNaN(soap) || soap <= 1) soap = detectedBaskets;
+    if (isNaN(labor) || labor <= 1) labor = detectedBaskets;
+    if (isNaN(softener) || softener <= 1) softener = detectedBaskets;
+  }
+
+  // Si washCount > 1 pero las otras columnas de combo quedaron en 1
+  if (wash > 1) {
+    if (isNaN(dry) || dry === 1) dry = wash;
+    if (isNaN(soap) || soap === 1) soap = wash;
+    if (isNaN(labor) || labor === 1) labor = wash;
+    if (isNaN(softener) || softener === 1) softener = wash;
+  }
+
+  return {
+    ...r,
+    washCount: isNaN(wash) ? 1 : wash,
+    dryCount: isNaN(dry) ? (isNaN(wash) ? 1 : wash) : dry,
+    soapCount: isNaN(soap) ? (isNaN(wash) ? 1 : wash) : soap,
+    laborCount: isNaN(labor) ? (isNaN(wash) ? 1 : wash) : labor,
+    softenerCount: isNaN(softener) ? (isNaN(wash) ? 1 : wash) : softener,
+    bleachCount: bleach,
+    degreaserCount: degreaser
+  };
+}
+
 export function AppProvider({ children }) {
   // Estado de sincronización en la Nube (Firebase)
   const [isCloudConnected, setIsCloudConnected] = useState(() => !!getFirebaseConfig());
@@ -214,10 +269,21 @@ export function AppProvider({ children }) {
     localStorage.setItem('aj_orders', JSON.stringify(orders));
   }, [orders]);
 
+
   // Cuaderno Diario de Operaciones (Registros de clientes cargados por empleada/administrador)
   const [dailyRecords, setDailyRecords] = useState(() => {
     const saved = localStorage.getItem('aj_daily_records');
-    return saved ? JSON.parse(saved) : [
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(normalizeRecordServices);
+        }
+      } catch (e) {
+        console.warn('Error al parsear aj_daily_records:', e);
+      }
+    }
+    return [
       {
         id: 'rec_101',
         date: '2026-09-07',
@@ -465,23 +531,17 @@ export function AppProvider({ children }) {
             const currentList = Array.isArray(prev) ? prev.filter(r => r && r.id) : [];
             const map = new Map(currentList.map(r => [String(r.id), r]));
             cloudRecords.filter(cr => cr && cr.id).forEach(cr => {
-              map.set(String(cr.id), {
-                ...cr,
-                washCount: cr.washCount !== undefined ? Number(cr.washCount) : 1,
-                dryCount: cr.dryCount !== undefined ? Number(cr.dryCount) : 1,
-                soapCount: cr.soapCount !== undefined ? Number(cr.soapCount) : 1,
-                laborCount: cr.laborCount !== undefined ? Number(cr.laborCount) : 1,
-                softenerCount: cr.softenerCount !== undefined ? Number(cr.softenerCount) : 1,
-                bleachCount: Number(cr.bleachCount) || 0,
-                degreaserCount: Number(cr.degreaserCount) || 0,
-                totalUSD: Number(cr.totalUSD) || 0,
-                totalBs: Number(cr.totalBs) || 0,
-                amountPaidUSD: Number(cr.amountPaidUSD) || 0,
-                amountPaidBs: Number(cr.amountPaidBs) || 0,
-                debtUSD: Number(cr.debtUSD) || 0,
-                customerName: cr.customerName || 'Cliente sin nombre',
-                paymentStatus: cr.paymentStatus || 'pending',
-                deliveryStatus: cr.deliveryStatus || 'in_store'
+              const norm = normalizeRecordServices(cr);
+              map.set(String(norm.id), {
+                ...norm,
+                totalUSD: Number(norm.totalUSD) || 0,
+                totalBs: Number(norm.totalBs) || 0,
+                amountPaidUSD: Number(norm.amountPaidUSD) || 0,
+                amountPaidBs: Number(norm.amountPaidBs) || 0,
+                debtUSD: Number(norm.debtUSD) || 0,
+                customerName: norm.customerName || 'Cliente sin nombre',
+                paymentStatus: norm.paymentStatus || 'pending',
+                deliveryStatus: norm.deliveryStatus || 'in_store'
               });
             });
             const merged = Array.from(map.values()).sort((a, b) => {
@@ -642,45 +702,45 @@ export function AppProvider({ children }) {
     const recDate = newRecord.date || new Date().toISOString().split('T')[0];
     const isPaid = newRecord.paymentStatus === 'paid';
     const isDelivered = newRecord.deliveryStatus === 'delivered';
-    const record = {
+    const record = normalizeRecordServices({
       ...newRecord,
       id: nextId,
       date: recDate,
       time: newRecord.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       paymentDate: isPaid ? (newRecord.paymentDate || recDate) : null,
       deliveryStatus: newRecord.deliveryStatus || 'in_store'
-    };
+    });
     setDailyRecords(prev => [record, ...prev]);
 
     // Sincronizar automáticamente en la colección de Órdenes para que aparezca en Administración y Contabilidad
     const orderFormat = {
       id: `AJ-${nextId.slice(4)}`,
       originalId: nextId,
-      customerName: newRecord.customerName,
-      customerPhone: newRecord.customerPhone || 'En mostrador',
+      customerName: record.customerName,
+      customerPhone: record.customerPhone || 'En mostrador',
       date: record.date,
       time: record.time,
-      itemsSummary: newRecord.notes || `${newRecord.washCount || 1} Cesta(s) (${newRecord.washCount || 1} lav, ${newRecord.dryCount || 0} sec)`,
-      totalUSD: newRecord.totalUSD || 0,
-      totalBs: newRecord.totalBs || 0,
-      amountPaidUSD: newRecord.amountPaidUSD !== undefined ? newRecord.amountPaidUSD : (isPaid ? newRecord.totalUSD : 0),
-      amountPaidBs: newRecord.amountPaidBs !== undefined ? newRecord.amountPaidBs : (isPaid ? newRecord.totalBs : 0),
-      debtUSD: newRecord.debtUSD !== undefined ? newRecord.debtUSD : (isPaid ? 0 : newRecord.totalUSD),
-      paymentStatus: newRecord.paymentStatus || 'pending',
-      paymentMethod: newRecord.paymentMethod || 'pago_movil',
+      itemsSummary: record.notes || `${record.washCount} Cesta(s) (${record.washCount} lav, ${record.dryCount} sec)`,
+      totalUSD: record.totalUSD || 0,
+      totalBs: record.totalBs || 0,
+      amountPaidUSD: record.amountPaidUSD !== undefined ? record.amountPaidUSD : (isPaid ? record.totalUSD : 0),
+      amountPaidBs: record.amountPaidBs !== undefined ? record.amountPaidBs : (isPaid ? record.totalBs : 0),
+      debtUSD: record.debtUSD !== undefined ? record.debtUSD : (isPaid ? 0 : record.totalUSD),
+      paymentStatus: record.paymentStatus || 'pending',
+      paymentMethod: record.paymentMethod || 'pago_movil',
       paymentDate: record.paymentDate,
       orderStatus: isDelivered ? 'delivered' : 'ready',
-      deliveryStatus: newRecord.deliveryStatus || 'in_store',
-      origin: newRecord.origin || 'walk_in',
-      bankReference: newRecord.bankReference || '',
-      washCount: newRecord.washCount !== undefined ? newRecord.washCount : 1,
-      dryCount: newRecord.dryCount !== undefined ? newRecord.dryCount : 1,
-      soapCount: newRecord.soapCount !== undefined ? newRecord.soapCount : 1,
-      laborCount: newRecord.laborCount !== undefined ? newRecord.laborCount : 1,
-      softenerCount: newRecord.softenerCount !== undefined ? newRecord.softenerCount : 1,
-      bleachCount: newRecord.bleachCount || 0,
-      degreaserCount: newRecord.degreaserCount || 0,
-      notes: newRecord.notes || ''
+      deliveryStatus: record.deliveryStatus || 'in_store',
+      origin: record.origin || 'walk_in',
+      bankReference: record.bankReference || '',
+      washCount: record.washCount,
+      dryCount: record.dryCount,
+      soapCount: record.soapCount,
+      laborCount: record.laborCount,
+      softenerCount: record.softenerCount,
+      bleachCount: record.bleachCount || 0,
+      degreaserCount: record.degreaserCount || 0,
+      notes: record.notes || ''
     };
     setOrders(prev => [orderFormat, ...prev]);
 
@@ -711,9 +771,11 @@ export function AppProvider({ children }) {
     setDailyRecords(prev => {
       const target = prev.find(r => r.id === id);
       if (target) {
-        syncDocToCloud('daily_records', id, { ...target, ...updatedFields });
+        const merged = normalizeRecordServices({ ...target, ...updatedFields });
+        syncDocToCloud('daily_records', id, merged);
+        return prev.map(r => r.id === id ? merged : r);
       }
-      return prev.map(r => r.id === id ? { ...r, ...updatedFields } : r);
+      return prev;
     });
 
     // Sincronizar en órdenes

@@ -901,7 +901,17 @@ export default function EmployeeWorkStation() {
                     type="text"
                     required
                     value={inlineClientName}
-                    onChange={(e) => setInlineClientName(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setInlineClientName(val);
+                      const match = val.toLowerCase().match(/(\d+)\s*cesta/);
+                      if (match) {
+                        const num = parseInt(match[1], 10);
+                        if (num >= 1 && num <= 10) {
+                          handleInlineBasketsChange(num);
+                        }
+                      }
+                    }}
                     placeholder="Ej: Albert, Jenny..."
                     className="w-full px-3.5 py-2.5 sm:py-2 rounded-xl border border-slate-200 text-base sm:text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                   />
@@ -2083,7 +2093,22 @@ export default function EmployeeWorkStation() {
                     required
                     autoFocus
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomerName(val);
+                      const match = val.toLowerCase().match(/(\d+)\s*cesta/);
+                      if (match) {
+                        const num = parseInt(match[1], 10);
+                        if (num >= 1 && num <= 10) {
+                          setWashCount(num);
+                          setDryCount(num);
+                          setSoapCount(num);
+                          setLaborCount(num);
+                          setSoftenerCount(num);
+                          setManualTotalUSD((num * (prices.comboFull || 7.50)).toFixed(2));
+                        }
+                      }
+                    }}
                     placeholder="Ej: Albert, Jenny, Enrique..."
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
                   />
