@@ -460,14 +460,26 @@ export function AppProvider({ children }) {
     if (isConfigured) {
       // 1. Sincronización en vivo del Cuaderno Diario
       const unsubDaily = subscribeToCollection('daily_records', (cloudRecords) => {
-        if (cloudRecords && cloudRecords.length > 0) {
+        if (cloudRecords && Array.isArray(cloudRecords) && cloudRecords.length > 0) {
           setDailyRecords(prev => {
-            const currentList = Array.isArray(prev) ? prev : [];
-            const map = new Map(currentList.map(r => [r.id, r]));
-            cloudRecords.forEach(cr => map.set(cr.id, cr));
+            const currentList = Array.isArray(prev) ? prev.filter(r => r && r.id) : [];
+            const map = new Map(currentList.map(r => [String(r.id), r]));
+            cloudRecords.filter(cr => cr && cr.id).forEach(cr => {
+              map.set(String(cr.id), {
+                ...cr,
+                totalUSD: Number(cr.totalUSD) || 0,
+                totalBs: Number(cr.totalBs) || 0,
+                amountPaidUSD: Number(cr.amountPaidUSD) || 0,
+                amountPaidBs: Number(cr.amountPaidBs) || 0,
+                debtUSD: Number(cr.debtUSD) || 0,
+                customerName: cr.customerName || 'Cliente sin nombre',
+                paymentStatus: cr.paymentStatus || 'pending',
+                deliveryStatus: cr.deliveryStatus || 'in_store'
+              });
+            });
             const merged = Array.from(map.values()).sort((a, b) => {
-              const dateA = (a.date || '') + ' ' + (a.time || '');
-              const dateB = (b.date || '') + ' ' + (b.time || '');
+              const dateA = String(a.date || '') + ' ' + String(a.time || '');
+              const dateB = String(b.date || '') + ' ' + String(b.time || '');
               return dateB.localeCompare(dateA);
             });
             return merged;
@@ -477,12 +489,12 @@ export function AppProvider({ children }) {
 
       // 2. Sincronización en vivo de Cierres Diarios
       const unsubClosures = subscribeToCollection('daily_closures', (cloudClosures) => {
-        if (cloudClosures && cloudClosures.length > 0) {
+        if (cloudClosures && Array.isArray(cloudClosures) && cloudClosures.length > 0) {
           setDailyClosures(prev => {
-            const currentList = Array.isArray(prev) ? prev : [];
-            const map = new Map(currentList.map(c => [c.date, c]));
-            cloudClosures.forEach(cc => map.set(cc.date, cc));
-            return Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+            const currentList = Array.isArray(prev) ? prev.filter(c => c && c.date) : [];
+            const map = new Map(currentList.map(c => [String(c.date), c]));
+            cloudClosures.filter(cc => cc && cc.date).forEach(cc => map.set(String(cc.date), cc));
+            return Array.from(map.values()).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
           });
         }
       });

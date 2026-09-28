@@ -450,13 +450,16 @@ export default function EmployeeWorkStation() {
     alert('✅ Pago procesado y ropa marcada como entregada.');
   };
 
-  // Registros filtrados por fecha seleccionada
-  const recordsOfSelectedDate = dailyRecords.filter(r => r.date === selectedDate);
-  const searchedRecords = recordsOfSelectedDate.filter(r => 
-    r.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (r.bankReference && r.bankReference.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (r.notes && r.notes.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Registros filtrados por fecha seleccionada con protección contra nulos
+  const safeDailyRecords = (dailyRecords || []).filter(r => r && typeof r === 'object');
+  const safeClosures = (dailyClosures || []).filter(c => c && typeof c === 'object');
+  const recordsOfSelectedDate = safeDailyRecords.filter(r => r.date === selectedDate);
+  const searchedRecords = recordsOfSelectedDate.filter(r => {
+    const nameMatch = (r.customerName || '').toLowerCase().includes((searchTerm || '').toLowerCase());
+    const refMatch = r.bankReference ? String(r.bankReference).toLowerCase().includes((searchTerm || '').toLowerCase()) : false;
+    const notesMatch = r.notes ? String(r.notes).toLowerCase().includes((searchTerm || '').toLowerCase()) : false;
+    return nameMatch || refMatch || notesMatch;
+  });
 
   const appOrdersCount = recordsOfSelectedDate.filter(r => r.origin === 'app').length;
   const pendingAppOrdersCount = recordsOfSelectedDate.filter(r => r.origin === 'app' && r.intakeStatus === 'pending_intake').length;
@@ -472,7 +475,7 @@ export default function EmployeeWorkStation() {
   const rate = exchangeRate || 40.50;
 
   // Cierre existente para la fecha seleccionada
-  const existingClosure = dailyClosures.find(c => c.date === selectedDate);
+  const existingClosure = safeClosures.find(c => c && c.date === selectedDate);
   const isDayClosed = !!(existingClosure?.isClosed);
 
   // Ropa nueva del día seleccionado (creada en selectedDate) que ya pagó
@@ -491,7 +494,7 @@ export default function EmployeeWorkStation() {
 
   // Ropa del DEPÓSITO (de días anteriores) que fue COBRADA/ENTREGADA HOY
   // = registros creados ANTES del selectedDate, con paymentDate = selectedDate o deliveredDate = selectedDate
-  const depositoEntregadoHoy = dailyRecords.filter(r => {
+  const depositoEntregadoHoy = safeDailyRecords.filter(r => {
     if (r.date === selectedDate) return false; // solo las de días anteriores
     const cobradaHoy = r.paymentDate === selectedDate || r.deliveredDate === selectedDate;
     const fueEntregada = r.deliveryStatus === 'delivered' && (r.deliveredDate === selectedDate);

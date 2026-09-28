@@ -71,9 +71,11 @@ export default function AccountingDashboard() {
 
     // 1. Mapear todos los dailyRecords (donde se cargan los servicios de mostrador y cuaderno)
     (dailyRecords || []).forEach(r => {
+      if (!r || !r.id) return;
+      const rIdStr = String(r.id);
       const isPaid = r.paymentStatus === 'paid';
       const isDelivered = r.deliveryStatus === 'delivered';
-      const orderId = r.id.startsWith('rec_') ? `AJ-${r.id.slice(4)}` : r.id;
+      const orderId = rIdStr.startsWith('rec_') ? `AJ-${rIdStr.slice(4)}` : rIdStr;
       list.set(r.id, {
         id: orderId,
         recordId: r.id,
@@ -900,10 +902,15 @@ export default function AccountingDashboard() {
                         '🧼 *ENLACE DE CONEXIÓN - LAVANDERÍA AJ*\n' +
                         'Abre este enlace en el navegador de tu teléfono para conectar la base de datos en vivo con la laptop:\n\n' +
                         (() => {
-                          const saved = localStorage.getItem('aj_firebase_config');
-                          if (!saved) return window.location.origin;
-                          const cfg = JSON.parse(saved);
-                          return `${window.location.origin}/?sync_key=${encodeURIComponent(cfg.apiKey)}&sync_proj=${encodeURIComponent(cfg.projectId)}`;
+                          try {
+                            const saved = localStorage.getItem('aj_firebase_config');
+                            if (!saved) return window.location.origin;
+                            const cfg = JSON.parse(saved);
+                            if (!cfg || !cfg.apiKey || !cfg.projectId) return window.location.origin;
+                            return `${window.location.origin}/?sync_key=${encodeURIComponent(cfg.apiKey)}&sync_proj=${encodeURIComponent(cfg.projectId)}`;
+                          } catch (e) {
+                            return window.location.origin;
+                          }
                         })()
                       )}`}
                       target="_blank"

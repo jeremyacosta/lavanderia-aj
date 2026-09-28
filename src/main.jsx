@@ -32,7 +32,7 @@ createRoot(document.getElementById('root')).render(
 )
 
 // Registrar Service Worker para soporte PWA con actualización automática inmediata
-if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((registration) => {
       registration.update();
