@@ -467,6 +467,13 @@ export function AppProvider({ children }) {
             cloudRecords.filter(cr => cr && cr.id).forEach(cr => {
               map.set(String(cr.id), {
                 ...cr,
+                washCount: cr.washCount !== undefined ? Number(cr.washCount) : 1,
+                dryCount: cr.dryCount !== undefined ? Number(cr.dryCount) : 1,
+                soapCount: cr.soapCount !== undefined ? Number(cr.soapCount) : 1,
+                laborCount: cr.laborCount !== undefined ? Number(cr.laborCount) : 1,
+                softenerCount: cr.softenerCount !== undefined ? Number(cr.softenerCount) : 1,
+                bleachCount: Number(cr.bleachCount) || 0,
+                degreaserCount: Number(cr.degreaserCount) || 0,
                 totalUSD: Number(cr.totalUSD) || 0,
                 totalBs: Number(cr.totalBs) || 0,
                 amountPaidUSD: Number(cr.amountPaidUSD) || 0,
@@ -666,6 +673,13 @@ export function AppProvider({ children }) {
       deliveryStatus: newRecord.deliveryStatus || 'in_store',
       origin: newRecord.origin || 'walk_in',
       bankReference: newRecord.bankReference || '',
+      washCount: newRecord.washCount !== undefined ? newRecord.washCount : 1,
+      dryCount: newRecord.dryCount !== undefined ? newRecord.dryCount : 1,
+      soapCount: newRecord.soapCount !== undefined ? newRecord.soapCount : 1,
+      laborCount: newRecord.laborCount !== undefined ? newRecord.laborCount : 1,
+      softenerCount: newRecord.softenerCount !== undefined ? newRecord.softenerCount : 1,
+      bleachCount: newRecord.bleachCount || 0,
+      degreaserCount: newRecord.degreaserCount || 0,
       notes: newRecord.notes || ''
     };
     setOrders(prev => [orderFormat, ...prev]);

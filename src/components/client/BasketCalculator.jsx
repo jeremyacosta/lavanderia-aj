@@ -228,14 +228,22 @@ export default function BasketCalculator() {
       return;
     }
 
+    const totalComforters = totalComfortersCount || 0;
+    const effectiveTotalBaskets = Math.max(1, effectiveBaskets + totalComforters);
+    const calculatedWashCount = effectiveTotalBaskets;
+    const calculatedDryCount = (basePlan === 'washWithSoap' && basePlan !== 'custom') ? totalComforters : effectiveTotalBaskets;
+    const calculatedSoapCount = effectiveTotalBaskets;
+    const calculatedLaborCount = effectiveTotalBaskets;
+    const calculatedSoftenerCount = (basePlan === 'comboFull' && basePlan !== 'custom') ? effectiveTotalBaskets : totalComforters;
+
     const createdRecord = addDailyRecord({
       customerName: clientName.trim(),
       customerPhone: clientPhone.trim() || 'Portal Web',
-      washCount: effectiveBaskets,
-      dryCount: (basePlan === 'washWithSoap' && basePlan !== 'custom') ? 0 : effectiveBaskets,
-      soapCount: effectiveBaskets,
-      laborCount: effectiveBaskets,
-      softenerCount: (basePlan === 'comboFull' && basePlan !== 'custom') ? effectiveBaskets : 0,
+      washCount: calculatedWashCount,
+      dryCount: calculatedDryCount,
+      soapCount: calculatedSoapCount,
+      laborCount: calculatedLaborCount,
+      softenerCount: calculatedSoftenerCount,
       bleachCount: addBleach ? 1 : 0,
       degreaserCount: addDegreaser ? 1 : 0,
       totalUSD: totalUSD,

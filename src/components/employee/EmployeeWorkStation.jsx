@@ -50,12 +50,32 @@ export default function EmployeeWorkStation() {
   // Estado para la Barra Directa de Carga en Mostrador
   const [inlineClientName, setInlineClientName] = useState('');
   const [inlineClientPhone, setInlineClientPhone] = useState('');
+  const [inlineBaskets, setInlineBaskets] = useState(1);
+  const [inlineWashCount, setInlineWashCount] = useState(1);
+  const [inlineDryCount, setInlineDryCount] = useState(1);
+  const [inlineSoapCount, setInlineSoapCount] = useState(1);
+  const [inlineLaborCount, setInlineLaborCount] = useState(1);
+  const [inlineSoftenerCount, setInlineSoftenerCount] = useState(1);
+  const [inlineBleachCount, setInlineBleachCount] = useState(0);
+  const [inlineDegreaserCount, setInlineDegreaserCount] = useState(0);
   const [inlineAmountUSD, setInlineAmountUSD] = useState('7.50');
   const [inlineCurrencyMode, setInlineCurrencyMode] = useState('USD'); // 'USD' o 'BS'
   const [inlinePayMethod, setInlinePayMethod] = useState('usd_cash'); // 'usd_cash' | 'pago_movil' | 'bs_cash' | 'pending'
   const [inlineBankRef, setInlineBankRef] = useState('');
   const [inlineNotes, setInlineNotes] = useState('');
   const [inlineSuccessToast, setInlineSuccessToast] = useState('');
+
+  // Modal de Edición Rápida de Servicios/Cestas de un Ticket existente
+  const [editServicesModalOpen, setEditServicesModalOpen] = useState(false);
+  const [recordToEditServices, setRecordToEditServices] = useState(null);
+  const [editWashCount, setEditWashCount] = useState(1);
+  const [editDryCount, setEditDryCount] = useState(1);
+  const [editSoapCount, setEditSoapCount] = useState(1);
+  const [editLaborCount, setEditLaborCount] = useState(1);
+  const [editSoftenerCount, setEditSoftenerCount] = useState(1);
+  const [editBleachCount, setEditBleachCount] = useState(0);
+  const [editDegreaserCount, setEditDegreaserCount] = useState(0);
+  const [editTotalUSD, setEditTotalUSD] = useState('');
 
   // === MODAL HACER CIERRE DEL DIA ===
   const [closureModalOpen, setClosureModalOpen] = useState(false);
@@ -230,6 +250,71 @@ export default function EmployeeWorkStation() {
     window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
   };
 
+  // Cambio dinámico de cestas y sincronización de servicios para carga rápida
+  const handleInlineBasketsChange = (newCount) => {
+    const val = Math.max(1, newCount);
+    setInlineBaskets(val);
+    setInlineWashCount(val);
+    setInlineDryCount(val);
+    setInlineSoapCount(val);
+    setInlineLaborCount(val);
+    setInlineSoftenerCount(val);
+    const unit = prices.comboFull || 7.50;
+    const totalUSD = (val * unit).toFixed(2);
+    if (inlineCurrencyMode === 'BS') {
+      const rate = exchangeRate || 40.50;
+      setInlineAmountUSD((parseFloat(totalUSD) * rate).toFixed(2));
+    } else {
+      setInlineAmountUSD(totalUSD);
+    }
+  };
+
+  // Abrir Modal para Corregir/Editar Servicios de un Registro
+  const openEditServicesModal = (rec) => {
+    setRecordToEditServices(rec);
+    setEditWashCount(rec.washCount !== undefined ? Number(rec.washCount) : 1);
+    setEditDryCount(rec.dryCount !== undefined ? Number(rec.dryCount) : 1);
+    setEditSoapCount(rec.soapCount !== undefined ? Number(rec.soapCount) : 1);
+    setEditLaborCount(rec.laborCount !== undefined ? Number(rec.laborCount) : 1);
+    setEditSoftenerCount(rec.softenerCount !== undefined ? Number(rec.softenerCount) : 1);
+    setEditBleachCount(Number(rec.bleachCount) || 0);
+    setEditDegreaserCount(Number(rec.degreaserCount) || 0);
+    setEditTotalUSD((rec.totalUSD || 0).toString());
+    setEditServicesModalOpen(true);
+  };
+
+  const handleSaveEditServices = (e) => {
+    e.preventDefault();
+    if (!recordToEditServices) return;
+    const newTotalUSD = parseFloat(editTotalUSD) !== undefined && !isNaN(parseFloat(editTotalUSD)) ? parseFloat(editTotalUSD) : (recordToEditServices.totalUSD || 0);
+    const rate = exchangeRate || 40.50;
+    const newTotalBs = newTotalUSD * rate;
+    const isPaid = recordToEditServices.paymentStatus === 'paid';
+    const amountPaidUSD = isPaid ? newTotalUSD : (recordToEditServices.amountPaidUSD || 0);
+    const debtUSD = Math.max(0, newTotalUSD - amountPaidUSD);
+
+    updateDailyRecord(recordToEditServices.id, {
+      washCount: editWashCount,
+      dryCount: editDryCount,
+      soapCount: editSoapCount,
+      laborCount: editLaborCount,
+      softenerCount: editSoftenerCount,
+      bleachCount: editBleachCount,
+      degreaserCount: editDegreaserCount,
+      totalUSD: newTotalUSD,
+      totalBs: newTotalBs,
+      amountPaidUSD,
+      amountPaidBs: amountPaidUSD * rate,
+      debtUSD,
+      notes: recordToEditServices.notes || `${editWashCount} Cesta(s) (${editWashCount} lav, ${editDryCount} sec)`
+    });
+
+    setInlineSuccessToast(`✅ Servicios actualizados para "${recordToEditServices.customerName}": L:${editWashCount} · S:${editDryCount} · J:${editSoapCount} · Suav:${editSoftenerCount}`);
+    setTimeout(() => setInlineSuccessToast(''), 4000);
+    setEditServicesModalOpen(false);
+    setRecordToEditServices(null);
+  };
+
   // Manejador para carga directa e instantánea en barra de mostrador
   const handleInlineQuickAdd = (e) => {
     e.preventDefault();
@@ -250,18 +335,39 @@ export default function EmployeeWorkStation() {
     }
     const isPending = inlinePayMethod === 'pending';
 
+    let finalWash = inlineWashCount;
+    let finalDry = inlineDryCount;
+    let finalSoap = inlineSoapCount;
+    let finalLabor = inlineLaborCount;
+    let finalSoftener = inlineSoftenerCount;
+    let finalBleach = inlineBleachCount;
+    let finalDegreaser = inlineDegreaserCount;
+
+    // Detección inteligente: si el usuario no tocó los contadores pero el monto coincide con múltiplos exactos de cesta ($7.50 c/u)
+    const unitPrice = prices.comboFull || 7.50;
+    if (inlineBaskets === 1 && inlineWashCount === 1 && inlineDryCount === 1 && numUSD >= 14) {
+      const estimatedBaskets = Math.round(numUSD / unitPrice);
+      if (estimatedBaskets >= 2 && Math.abs(numUSD - (estimatedBaskets * unitPrice)) < 1.0) {
+        finalWash = estimatedBaskets;
+        finalDry = estimatedBaskets;
+        finalSoap = estimatedBaskets;
+        finalLabor = estimatedBaskets;
+        finalSoftener = estimatedBaskets;
+      }
+    }
+
     addDailyRecord({
       date: selectedDate,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       customerName: inlineClientName.trim(),
       customerPhone: inlineClientPhone.trim(),
-      washCount: 1,
-      dryCount: 1,
-      soapCount: 1,
-      laborCount: 1,
-      softenerCount: 1,
-      bleachCount: 0,
-      degreaserCount: 0,
+      washCount: finalWash,
+      dryCount: finalDry,
+      soapCount: finalSoap,
+      laborCount: finalLabor,
+      softenerCount: finalSoftener,
+      bleachCount: finalBleach,
+      degreaserCount: finalDegreaser,
       totalUSD: numUSD,
       totalBs: numBs,
       amountPaidUSD: isPending ? 0 : numUSD,
@@ -274,14 +380,22 @@ export default function EmployeeWorkStation() {
       deliveryStatus: 'in_store',
       origin: 'walk_in',
       intakeStatus: 'confirmed',
-      notes: inlineNotes.trim() || (isPending ? 'Ropa dejada / Paga al retirar' : 'Cargado directamente en mostrador')
+      notes: inlineNotes.trim() || `${finalWash} Cesta(s) (${finalWash} lav, ${finalDry} sec)`
     });
 
-    setInlineSuccessToast(`✅ "${inlineClientName.trim()}" registrado · $${numUSD.toFixed(2)} USD ≈ Bs. ${numBs.toLocaleString('es-VE', {minimumFractionDigits:2})}`);
+    setInlineSuccessToast(`✅ "${inlineClientName.trim()}" registrado · ${finalWash} Cesta(s) · $${numUSD.toFixed(2)} USD ≈ Bs. ${numBs.toLocaleString('es-VE', {minimumFractionDigits:2})}`);
     setTimeout(() => setInlineSuccessToast(''), 4000);
 
     setInlineClientName('');
     setInlineClientPhone('');
+    setInlineBaskets(1);
+    setInlineWashCount(1);
+    setInlineDryCount(1);
+    setInlineSoapCount(1);
+    setInlineLaborCount(1);
+    setInlineSoftenerCount(1);
+    setInlineBleachCount(0);
+    setInlineDegreaserCount(0);
     setInlineAmountUSD('7.50');
     setInlineBankRef('');
     setInlineNotes('');
@@ -777,7 +891,7 @@ export default function EmployeeWorkStation() {
             </div>
 
             <form onSubmit={handleInlineQuickAdd} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
                 {/* 1. Nombre del Cliente */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -807,7 +921,36 @@ export default function EmployeeWorkStation() {
                   />
                 </div>
 
-                {/* 3. Monto con toggle $ / Bs */}
+                {/* 3. Selector de Cestas */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    🧺 Cestas:
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleInlineBasketsChange(inlineBaskets - 1)}
+                      className="w-9 h-10 sm:h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-lg flex items-center justify-center border border-slate-200 transition-colors shrink-0"
+                      title="Restar una cesta"
+                    >
+                      -
+                    </button>
+                    <div className="flex-1 text-center bg-blue-50 border border-blue-200 rounded-xl py-1.5 px-2">
+                      <span className="font-black text-blue-950 text-sm leading-tight block">{inlineBaskets}</span>
+                      <span className="text-[10px] text-blue-700 font-bold block leading-none">cesta{inlineBaskets > 1 ? 's' : ''}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineBasketsChange(inlineBaskets + 1)}
+                      className="w-9 h-10 sm:h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-lg flex items-center justify-center shadow-xs transition-colors shrink-0"
+                      title="Sumar una cesta"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4. Monto con toggle $ / Bs */}
                 <div>
                   <label className="block text-xs font-bold mb-1" style={{color: inlineCurrencyMode === 'BS' ? '#854d0e' : '#1e3a8a'}}>
                     Monto {inlineCurrencyMode === 'BS' ? 'en Bolívares (Bs.)' : 'en Dólares ($ USD)'} *:
@@ -844,7 +987,7 @@ export default function EmployeeWorkStation() {
                   )}
                 </div>
 
-                {/* 4. Forma de Pago */}
+                {/* 5. Forma de Pago */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Forma de Pago:
@@ -861,7 +1004,7 @@ export default function EmployeeWorkStation() {
                   </select>
                 </div>
 
-                {/* 5. Referencia y Botón Guardar */}
+                {/* 6. Referencia y Botón Guardar */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Referencia / RF:
@@ -885,79 +1028,157 @@ export default function EmployeeWorkStation() {
                 </div>
               </div>
 
-              {/* Atajos Rápidos de Monto en Mostrador */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">Montos Rápidos:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInlineAmountUSD('7.50');
-                    setInlineNotes('1 Cesta Combo ($7.50)');
-                  }}
-                  className="px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-extrabold border border-blue-200"
-                >
-                  🧺 1 Cesta ($7.50)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInlineAmountUSD('15.00');
-                    setInlineNotes('2 Cestas Combo ($15.00)');
-                  }}
-                  className="px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-extrabold border border-blue-200"
-                >
-                  🧺🧺 2 Cestas ($15.00)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInlineAmountUSD('4.50');
-                    setInlineNotes('Solo Lavado + Jabón ($4.50)');
-                  }}
-                  className="px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-extrabold border border-blue-200"
-                >
-                  🫧 Lavado + Jabón ($4.50)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInlineAmountUSD('10.00');
-                    setInlineNotes('Edredón Individual ($10.00)');
-                  }}
-                  className="px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[11px] font-extrabold border border-indigo-200"
-                >
-                  🛏️ Edredón Ind ($10)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInlineAmountUSD('12.00');
-                    setInlineNotes('Edredón Matrimonial ($12.00)');
-                  }}
-                  className="px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[11px] font-extrabold border border-indigo-200"
-                >
-                  🛏️ Edredón Mat ($12)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInlineAmountUSD('14.00');
-                    setInlineNotes('Edredón Grande ($14.00)');
-                  }}
-                  className="px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[11px] font-extrabold border border-indigo-200"
-                >
-                  🛏️ Edredón Grande ($14)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInlineAmountUSD('32.00');
-                    setInlineNotes('Forros de Autobús ($32.00)');
-                  }}
-                  className="px-2 py-0.5 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-800 text-[11px] font-extrabold border border-cyan-200"
-                >
-                  🚌 Forros Bus ($32)
-                </button>
+              {/* Atajos Rápidos de Carga y Desglose Visual */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">Carga Rápida:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleInlineBasketsChange(1);
+                      setInlineNotes('1 Cesta Combo ($7.50)');
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold border transition-all ${inlineBaskets === 1 && inlineDryCount === 1 ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
+                  >
+                    🧺 1 Cesta ($7.50)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleInlineBasketsChange(2);
+                      setInlineNotes('2 Cestas Combo ($15.00)');
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold border transition-all ${inlineBaskets === 2 && inlineDryCount === 2 ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
+                  >
+                    🧺🧺 2 Cestas ($15.00)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleInlineBasketsChange(3);
+                      setInlineNotes('3 Cestas Combo ($22.50)');
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold border transition-all ${inlineBaskets === 3 && inlineDryCount === 3 ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
+                  >
+                    🧺x3 3 Cestas ($22.50)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleInlineBasketsChange(4);
+                      setInlineNotes('4 Cestas Combo ($30.00)');
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold border transition-all ${inlineBaskets === 4 && inlineDryCount === 4 ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
+                  >
+                    🧺x4 4 Cestas ($30.00)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInlineBaskets(1);
+                      setInlineWashCount(1);
+                      setInlineDryCount(0);
+                      setInlineSoapCount(1);
+                      setInlineLaborCount(1);
+                      setInlineSoftenerCount(0);
+                      setInlineAmountUSD('4.50');
+                      setInlineNotes('Solo Lavado + Jabón ($4.50)');
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold border border-slate-200"
+                  >
+                    🫧 Lavado + Jabón ($4.50)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInlineBaskets(1);
+                      setInlineWashCount(0);
+                      setInlineDryCount(1);
+                      setInlineSoapCount(0);
+                      setInlineLaborCount(1);
+                      setInlineSoftenerCount(0);
+                      setInlineAmountUSD('3.00');
+                      setInlineNotes('Solo Secado ($3.00)');
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold border border-slate-200"
+                  >
+                    💨 Solo Secado ($3.00)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInlineBaskets(1);
+                      setInlineWashCount(1);
+                      setInlineDryCount(1);
+                      setInlineSoapCount(1);
+                      setInlineLaborCount(1);
+                      setInlineSoftenerCount(1);
+                      setInlineAmountUSD('10.00');
+                      setInlineNotes('Edredón Individual ($10.00)');
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200"
+                  >
+                    🛏️ Edredón Ind ($10)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInlineBaskets(1);
+                      setInlineWashCount(1);
+                      setInlineDryCount(1);
+                      setInlineSoapCount(1);
+                      setInlineLaborCount(1);
+                      setInlineSoftenerCount(1);
+                      setInlineAmountUSD('12.00');
+                      setInlineNotes('Edredón Matrimonial ($12.00)');
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200"
+                  >
+                    🛏️ Edredón Mat ($12)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInlineBaskets(1);
+                      setInlineWashCount(1);
+                      setInlineDryCount(1);
+                      setInlineSoapCount(1);
+                      setInlineLaborCount(1);
+                      setInlineSoftenerCount(1);
+                      setInlineAmountUSD('14.00');
+                      setInlineNotes('Edredón Grande ($14.00)');
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200"
+                  >
+                    🛏️ Edredón Grande ($14)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInlineBaskets(4);
+                      setInlineWashCount(4);
+                      setInlineDryCount(4);
+                      setInlineSoapCount(4);
+                      setInlineLaborCount(4);
+                      setInlineSoftenerCount(4);
+                      setInlineAmountUSD('32.00');
+                      setInlineNotes('Forros de Autobús ($32.00)');
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 text-xs font-bold border border-cyan-200"
+                  >
+                    🚌 Forros Bus ($32)
+                  </button>
+                </div>
+
+                {/* Desglose visual interactivo de servicios que se guardarán en el Cuaderno */}
+                <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-2xl text-xs font-bold text-slate-700">
+                  <span className="text-[11px] text-slate-500 mr-0.5">Se anotará:</span>
+                  <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">🫧 L: {inlineWashCount}</span>
+                  <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">💨 S: {inlineDryCount}</span>
+                  <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">🧼 J: {inlineSoapCount}</span>
+                  <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">✋ MO: {inlineLaborCount}</span>
+                  <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-purple-700 font-black">🌸 Suav: {inlineSoftenerCount}</span>
+                </div>
               </div>
             </form>
           </div>
@@ -1171,9 +1392,14 @@ export default function EmployeeWorkStation() {
 
                     {/* Fila 2: Desglose de Prendas y Servicios */}
                     <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
-                      <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-1 font-black">
-                        🧺 {rec.washCount || 1} Cesta(s)
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openEditServicesModal(rec)}
+                        className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1 font-black transition-colors"
+                        title="Toca para modificar las cestas o servicios de este ticket"
+                      >
+                        🧺 {rec.washCount || 1} Cesta(s) <span className="text-[11px] text-blue-600 font-normal">✏️</span>
+                      </button>
                       {rec.washCount > 0 && <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">🫧 {rec.washCount} Lav</span>}
                       {rec.dryCount > 0 && <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">💨 {rec.dryCount} Sec</span>}
                       {rec.soapCount > 0 && <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">🧼 {rec.soapCount} Jab</span>}
@@ -1385,7 +1611,17 @@ export default function EmployeeWorkStation() {
                             </button>
                           )}
                         </td>
-                        <td className="py-3 px-2 text-center font-bold text-slate-800">{rec.washCount || 0}</td>
+                        <td className="py-3 px-2 text-center font-bold text-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => openEditServicesModal(rec)}
+                            className="hover:bg-blue-100 hover:text-blue-800 px-2 py-0.5 rounded-lg text-blue-700 font-black inline-flex items-center gap-1 transition-colors"
+                            title="Haz clic para modificar los servicios (Lavado, Secado, Jabón, etc.) de este ticket"
+                          >
+                            <span>{rec.washCount || 0}</span>
+                            <span className="text-[10px] text-blue-500 font-normal">✏️</span>
+                          </button>
+                        </td>
                         <td className="py-3 px-2 text-center font-bold text-slate-800">{rec.dryCount || 0}</td>
                         <td className="py-3 px-2 text-center font-bold text-slate-800">{rec.soapCount || 0}</td>
                         <td className="py-3 px-2 text-center font-bold text-slate-800">{rec.laborCount || 0}</td>
@@ -2409,6 +2645,135 @@ export default function EmployeeWorkStation() {
                 >
                   <Check size={16} />
                   <span>Confirmar Recepción y Guardar</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: EDITAR SERVICIOS Y CESTAS DE UN TICKET EXISTENTE */}
+      {editServicesModalOpen && recordToEditServices && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 border border-blue-200 shadow-2xl animate-in fade-in zoom-in duration-150 text-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold border border-blue-200 text-lg">
+                  🧺
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Modificar Servicios y Cestas</h3>
+                  <p className="text-xs text-slate-500">
+                    Cliente: <strong>{recordToEditServices.customerName}</strong> {recordToEditServices.customerPhone ? `(${recordToEditServices.customerPhone})` : ''}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setEditServicesModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditServices} className="space-y-4">
+              {/* Atajos Rápidos para el Ticket */}
+              <div className="p-3 bg-blue-50/60 rounded-2xl border border-blue-200/80 space-y-1.5">
+                <span className="text-[11px] font-black text-blue-900 uppercase tracking-wide flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-amber-500" />
+                  Ajustar Rápido a:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[1, 2, 3, 4].map(num => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => {
+                        setEditWashCount(num);
+                        setEditDryCount(num);
+                        setEditSoapCount(num);
+                        setEditLaborCount(num);
+                        setEditSoftenerCount(num);
+                        setEditTotalUSD((num * (prices.comboFull || 7.50)).toFixed(2));
+                      }}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-bold border transition-colors ${
+                        editWashCount === num && editDryCount === num 
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs' 
+                          : 'bg-white hover:bg-blue-100 text-blue-900 border-blue-200'
+                      }`}
+                    >
+                      🧺 {num} Cesta{num > 1 ? 's' : ''} (${(num * (prices.comboFull || 7.50)).toFixed(2)})
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Contadores Detallados */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {[
+                  { label: 'Lavado (L)', val: editWashCount, setter: setEditWashCount, color: 'text-blue-700' },
+                  { label: 'Secado (S)', val: editDryCount, setter: setEditDryCount, color: 'text-blue-700' },
+                  { label: 'Jabón (J)', val: editSoapCount, setter: setEditSoapCount, color: 'text-blue-700' },
+                  { label: 'Mano O. (MO)', val: editLaborCount, setter: setEditLaborCount, color: 'text-blue-700' },
+                  { label: 'Suavizante', val: editSoftenerCount, setter: setEditSoftenerCount, color: 'text-purple-700' },
+                  { label: 'Cloro', val: editBleachCount, setter: setEditBleachCount, color: 'text-cyan-700' },
+                  { label: 'Desengrasante', val: editDegreaserCount, setter: setEditDegreaserCount, color: 'text-amber-700' }
+                ].map((s, idx) => (
+                  <div key={idx} className="bg-slate-50 p-2.5 rounded-2xl border border-slate-200 text-center">
+                    <p className={`text-[10px] font-black uppercase mb-1 ${s.color}`}>{s.label}</p>
+                    <div className="flex items-center justify-between gap-1 bg-white rounded-xl border border-slate-200 px-1 py-0.5">
+                      <button
+                        type="button"
+                        onClick={() => s.setter(Math.max(0, s.val - 1))}
+                        className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white font-black text-sm flex items-center justify-center transition-colors"
+                      >
+                        -
+                      </button>
+                      <span className="font-mono font-black text-sm text-slate-900 w-5">{s.val}</span>
+                      <button
+                        type="button"
+                        onClick={() => s.setter(s.val + 1)}
+                        className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white font-black text-sm flex items-center justify-center transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Monto Total Cobrado */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Monto Total USD ($):</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={editTotalUSD}
+                    onChange={(e) => setEditTotalUSD(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono font-black text-sm text-slate-900 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-xs font-bold text-slate-500 whitespace-nowrap">
+                    ≈ Bs. {((parseFloat(editTotalUSD) || 0) * (exchangeRate || 40.50)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditServicesModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase shadow-md flex items-center gap-1.5 transition-transform active:scale-95"
+                >
+                  <Check size={16} />
+                  <span>Guardar Servicios</span>
                 </button>
               </div>
             </form>
