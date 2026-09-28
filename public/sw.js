@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lavanderia-aj-v3';
+const CACHE_NAME = 'lavanderia-aj-v4';
 const ASSETS_TO_CACHE = [
   '/', 
   '/index.html', 

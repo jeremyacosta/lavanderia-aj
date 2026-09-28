@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider } from './context/AppContext';
 import HeaderStatus from './components/client/HeaderStatus';
 import BasketCalculator from './components/client/BasketCalculator';
