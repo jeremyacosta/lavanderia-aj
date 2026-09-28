@@ -393,8 +393,8 @@ export default function AccountingDashboard() {
                 <p className="text-sm font-semibold">No hay tickets registrados en este periodo</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto touch-scroll w-full" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
+                <table className="w-full text-left text-xs min-w-[640px]">
                   <thead className="bg-slate-50 text-slate-500 font-mono uppercase text-[11px] border-b border-slate-100">
                     <tr>
                       <th className="py-3 px-4">Ticket</th>

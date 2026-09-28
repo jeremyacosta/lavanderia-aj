@@ -5,7 +5,7 @@ import {
   Clock, AlertCircle, Trash2, Check, DollarSign, 
   Sparkles, X, ShieldAlert, FileText, Share2, 
   Package, Droplets, CheckSquare, Layers, Lock, 
-  Calendar, Eye, Phone, RefreshCw, Smartphone, ArrowRight
+  Calendar, Eye, Phone, RefreshCw, Smartphone, ArrowRight, MessageCircle
 } from 'lucide-react';
 
 export default function EmployeeWorkStation() {
@@ -33,6 +33,7 @@ export default function EmployeeWorkStation() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
   const [originFilter, setOriginFilter] = useState('all'); // 'all' | 'walk_in' | 'app'
+  const [mobileViewMode, setMobileViewMode] = useState('cards'); // 'cards' | 'table'
 
   // Modal para recepcionar y ajustar pedidos que llegaron de la App
   const [intakeModalOpen, setIntakeModalOpen] = useState(false);
@@ -207,6 +208,25 @@ export default function EmployeeWorkStation() {
     setPaymentStatus('paid');
     setMarkedNewDetergent(false);
     setOriginFilter('all');
+  };
+
+  // Notificar al cliente por WhatsApp que su ropa está lista
+  const notifyCustomerWhatsApp = (rec) => {
+    const rawPhone = (rec.customerPhone || '').replace(/\D/g, '');
+    let cleanPhone = rawPhone;
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '58' + cleanPhone.slice(1);
+    } else if (!cleanPhone.startsWith('58')) {
+      cleanPhone = '58' + cleanPhone;
+    }
+    const text = encodeURIComponent(
+      `🧼 *LAVANDERÍA AJ*\n` +
+      `¡Hola ${rec.customerName}! Tu ropa (${rec.washCount || 1} cesta/servicio) ya está lista para retirar en nuestro local.\n` +
+      `💵 Total: $${(rec.totalUSD || 0).toFixed(2)} USD (Bs. ${(rec.totalBs || 0).toLocaleString('es-VE')})\n` +
+      `📌 Estado: ${rec.paymentStatus === 'paid' ? '✅ Ya pagado' : `⏳ Saldo pendiente: $${(rec.debtUSD || rec.totalUSD || 0).toFixed(2)} USD`}\n` +
+      `¡Te esperamos!`
+    );
+    window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
   };
 
   // Manejador para carga directa e instantánea en barra de mostrador
@@ -710,7 +730,7 @@ export default function EmployeeWorkStation() {
           )}
 
           {/* BARRA DIRECTA DE CARGA EN MOSTRADOR */}
-          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-blue-200 shadow-md w-full max-w-full overflow-hidden">
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-blue-200 shadow-md w-full max-w-full">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 mb-3 border-b border-blue-50 pb-2">
               <div className="flex items-center gap-2">
                 <span className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black text-sm shrink-0">
@@ -743,7 +763,7 @@ export default function EmployeeWorkStation() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                 {/* 1. Nombre del Cliente */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     Cliente *:
                   </label>
                   <input
@@ -752,13 +772,13 @@ export default function EmployeeWorkStation() {
                     value={inlineClientName}
                     onChange={(e) => setInlineClientName(e.target.value)}
                     placeholder="Ej: Albert, Jenny..."
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 sm:py-2 rounded-xl border border-slate-200 text-base sm:text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                   />
                 </div>
 
                 {/* 2. Teléfono */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     Teléfono (Opcional):
                   </label>
                   <input
@@ -766,24 +786,24 @@ export default function EmployeeWorkStation() {
                     value={inlineClientPhone}
                     onChange={(e) => setInlineClientPhone(e.target.value)}
                     placeholder="Ej: 0412..."
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 sm:py-2 rounded-xl border border-slate-200 text-base sm:text-xs font-mono text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                   />
                 </div>
 
                 {/* 3. Monto con toggle $ / Bs */}
                 <div>
-                  <label className="block text-[11px] font-bold mb-1" style={{color: inlineCurrencyMode === 'BS' ? '#854d0e' : '#1e3a8a'}}>
-                    Monto {inlineCurrencyMode === 'BS' ? 'en Bs.' : 'en $ USD'} *:
+                  <label className="block text-xs font-bold mb-1" style={{color: inlineCurrencyMode === 'BS' ? '#854d0e' : '#1e3a8a'}}>
+                    Monto {inlineCurrencyMode === 'BS' ? 'en Bolívares (Bs.)' : 'en Dólares ($ USD)'} *:
                   </label>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1.5">
                     {/* Toggle moneda */}
                     <button
                       type="button"
                       onClick={() => { setInlineCurrencyMode(inlineCurrencyMode === 'USD' ? 'BS' : 'USD'); setInlineAmountUSD(''); }}
-                      className={`px-2 py-2 rounded-xl text-xs font-black border shrink-0 transition-all ${inlineCurrencyMode === 'USD' ? 'bg-blue-600 text-white border-blue-600' : 'bg-amber-500 text-white border-amber-500'}`}
+                      className={`px-3 py-2.5 sm:py-2 rounded-xl text-sm sm:text-xs font-black border shrink-0 transition-all ${inlineCurrencyMode === 'USD' ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-amber-500 text-white border-amber-500 shadow-xs'}`}
                       title="Cambiar moneda de entrada"
                     >
-                      {inlineCurrencyMode === 'USD' ? '$' : 'Bs'}
+                      {inlineCurrencyMode === 'USD' ? '💵 $' : '🇻🇪 Bs'}
                     </button>
                     <input
                       type="number"
@@ -792,16 +812,16 @@ export default function EmployeeWorkStation() {
                       value={inlineAmountUSD}
                       onChange={(e) => setInlineAmountUSD(e.target.value)}
                       placeholder={inlineCurrencyMode === 'BS' ? 'Ej: 6420' : '7.50'}
-                      className={`w-full px-3 py-2 rounded-xl text-xs font-mono font-black focus:outline-none focus:ring-2 ${inlineCurrencyMode === 'BS' ? 'border border-amber-400 bg-amber-50/40 text-amber-950 focus:ring-amber-400' : 'border border-blue-300 bg-blue-50/40 text-blue-950 focus:ring-blue-500'}`}
+                      className={`w-full px-3.5 py-2.5 sm:py-2 rounded-xl text-base sm:text-xs font-mono font-black focus:outline-none focus:ring-2 ${inlineCurrencyMode === 'BS' ? 'border border-amber-400 bg-amber-50/50 text-amber-950 focus:ring-amber-400' : 'border border-blue-300 bg-blue-50/50 text-blue-950 focus:ring-blue-500'}`}
                     />
                   </div>
                   {/* Conversión automática */}
                   {inlineCurrencyMode === 'USD' ? (
-                    <span className="text-[10px] text-blue-700 font-semibold block mt-0.5">
+                    <span className="text-xs text-blue-700 font-bold block mt-1">
                       ≈ Bs. {((parseFloat(inlineAmountUSD) || 0) * (exchangeRate || 1)).toLocaleString('es-VE', { minimumFractionDigits: 2 })} <span className="text-slate-400 font-normal lowercase select-none">+ iva</span>
                     </span>
                   ) : (
-                    <span className="text-[10px] text-amber-700 font-semibold block mt-0.5">
+                    <span className="text-xs text-amber-700 font-bold block mt-1">
                       ≈ $ {((parseFloat(inlineAmountUSD) || 0) / (exchangeRate || 1)).toFixed(2)} USD <span className="text-slate-400 font-normal lowercase select-none">+ iva</span>
                     </span>
                   )}
@@ -809,13 +829,13 @@ export default function EmployeeWorkStation() {
 
                 {/* 4. Forma de Pago */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     Forma de Pago:
                   </label>
                   <select
                     value={inlinePayMethod}
                     onChange={(e) => setInlinePayMethod(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none"
+                    className="w-full px-3.5 py-2.5 sm:py-2 rounded-xl border border-slate-200 text-sm sm:text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none focus:bg-white transition-all"
                   >
                     <option value="usd_cash">💵 Efectivo USD ($)</option>
                     <option value="pago_movil">📱 Pago Móvil</option>
@@ -826,7 +846,7 @@ export default function EmployeeWorkStation() {
 
                 {/* 5. Referencia y Botón Guardar */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     Referencia / RF:
                   </label>
                   <div className="flex gap-2">
@@ -835,13 +855,13 @@ export default function EmployeeWorkStation() {
                       value={inlineBankRef}
                       onChange={(e) => setInlineBankRef(e.target.value)}
                       placeholder="Ej: RF 1234"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono text-slate-900 bg-slate-50 focus:outline-none"
+                      className="w-full px-3.5 py-2.5 sm:py-2 rounded-xl border border-slate-200 text-base sm:text-xs font-mono text-slate-900 bg-slate-50 focus:outline-none focus:bg-white transition-all"
                     />
                     <button
                       type="submit"
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase shadow-md flex items-center gap-1.5 shrink-0 transition-transform active:scale-95"
+                      className="px-5 py-2.5 sm:py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm sm:text-xs uppercase shadow-md flex items-center justify-center gap-1.5 shrink-0 transition-transform active:scale-95"
                     >
-                      <Plus size={16} />
+                      <Plus size={18} />
                       <span>Cargar</span>
                     </button>
                   </div>
@@ -1041,15 +1061,250 @@ export default function EmployeeWorkStation() {
             </div>
           </div>
 
-          {/* Tabla que replica el cuaderno físico */}
-          <div className="bg-white rounded-3xl border border-blue-200/80 shadow-md overflow-hidden w-full max-w-full">
-            <div className="sm:hidden px-3.5 py-2 bg-blue-50 text-[11px] text-blue-700 font-bold flex items-center justify-between border-b border-blue-100">
-              <span>👈 Desliza horizontalmente la tabla 👉</span>
-              <span>{filteredByOrigin.length} filas</span>
+          {/* Selector de Modo de Vista en Pantalla Móvil (Tarjetas de Cerca vs Tabla Completa) */}
+          <div className="flex sm:hidden items-center justify-between bg-white p-2.5 rounded-2xl border border-blue-200/90 shadow-xs mb-1">
+            <span className="text-xs font-black text-slate-800 flex items-center gap-1.5 ml-1">
+              <span>Modo de Vista:</span>
+            </span>
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setMobileViewMode('cards')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                  mobileViewMode === 'cards'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>📱 Tarjetas (De Cerca)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileViewMode('table')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                  mobileViewMode === 'table'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>📋 Cuaderno Tabla</span>
+              </button>
             </div>
-            <div className="overflow-x-auto w-full max-w-full">
-              <table className="w-full text-left text-xs min-w-[720px]">
-                <thead className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-extrabold uppercase tracking-wider">
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              VISTA 1: TARJETAS MÓVILES ESTRUCTURADAS (BIEN DE CERCA)
+              Visible en móviles cuando mobileViewMode === 'cards'
+          ══════════════════════════════════════════════════════════════════ */}
+          {mobileViewMode === 'cards' && (
+            <div className="sm:hidden space-y-3">
+              {filteredByOrigin.length > 0 ? (
+                filteredByOrigin.map((rec) => (
+                  <div 
+                    key={rec.id} 
+                    className="bg-white rounded-2xl p-4 border border-blue-200 shadow-sm space-y-3 transition-all hover:border-blue-400"
+                  >
+                    {/* Fila 1: Cliente, Hora, Origen y Borrar */}
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-base font-black text-slate-900 tracking-tight leading-snug">
+                            {rec.customerName}
+                          </h4>
+                          <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md shrink-0">
+                            🕒 {rec.time}
+                          </span>
+                        </div>
+                        {rec.customerPhone && (
+                          <a 
+                            href={`tel:${rec.customerPhone}`}
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 font-mono font-bold mt-1 hover:underline"
+                          >
+                            <Phone size={12} />
+                            <span>{rec.customerPhone}</span>
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {rec.origin === 'app' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-blue-100 text-blue-800 border border-blue-200">
+                            <Smartphone size={12} /> App
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200">
+                            Mostrador
+                          </span>
+                        )}
+                        <button
+                          title="Eliminar registro (Requiere Clave de Administrador)"
+                          onClick={() => {
+                            setRecordToDelete(rec);
+                            setAdminPasswordInput('');
+                            setDeleteReasonInput('');
+                            setDeleteErrorMsg('');
+                            setDeleteModalOpen(true);
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Fila 2: Desglose de Prendas y Servicios */}
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+                      <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-1 font-black">
+                        🧺 {rec.washCount || 1} Cesta(s)
+                      </span>
+                      {rec.washCount > 0 && <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">🫧 {rec.washCount} Lav</span>}
+                      {rec.dryCount > 0 && <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">💨 {rec.dryCount} Sec</span>}
+                      {rec.soapCount > 0 && <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">🧼 {rec.soapCount} Jab</span>}
+                      {rec.softenerCount > 0 && <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200">🌸 {rec.softenerCount} Suav</span>}
+                      {rec.bleachCount > 0 && <span className="px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-200">🧪 Cloro</span>}
+                      {rec.degreaserCount > 0 && <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">✨ Deseng</span>}
+                    </div>
+
+                    {/* Nota si existe */}
+                    {rec.notes && (
+                      <p className="text-xs text-amber-900 bg-amber-50/80 p-2 rounded-xl border border-amber-200/70 italic">
+                        📝 {rec.notes}
+                      </p>
+                    )}
+
+                    {/* Si es pedido de app pendiente por recepcionar */}
+                    {rec.origin === 'app' && rec.intakeStatus === 'pending_intake' && (
+                      <button
+                        onClick={() => openIntakeModal(rec)}
+                        className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm animate-pulse"
+                      >
+                        <span>⚖️ Recibir Ropa / Ajustar Cestas</span>
+                      </button>
+                    )}
+
+                    {/* Fila 3: Bloque Financiero (Total, Conversión y Estado de Pago) */}
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Servicio</span>
+                        <p className="text-lg font-black text-blue-950 font-mono leading-tight">
+                          ${(rec.totalUSD || 0).toFixed(2)} <span className="text-xs font-semibold text-slate-500">USD</span>
+                        </p>
+                        <p className="text-xs font-bold text-slate-600 font-mono">
+                          ≈ Bs. {(rec.totalBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+
+                      <div className="text-right space-y-1">
+                        <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-black uppercase ${
+                          rec.paymentStatus === 'paid'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : rec.paymentStatus === 'partial'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : 'bg-red-100 text-red-800 border border-red-300'
+                        }`}>
+                          {rec.paymentStatus === 'paid' ? '✓ Pagado' : rec.paymentStatus === 'partial' ? `Abonó $${rec.amountPaidUSD.toFixed(2)}` : 'Debe al retirar'}
+                        </span>
+                        {rec.bankReference && (
+                          <p className="text-[10px] font-mono text-slate-600 block">
+                            {rec.bankReference}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Fila 4: Botones de Acción Táctiles (Grandes y Cómodos) */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {rec.deliveryStatus === 'delivered' ? (
+                        <div className="flex-1 flex items-center justify-between bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl text-emerald-800 text-xs font-bold">
+                          <span className="flex items-center gap-1.5">
+                            <CheckCircle2 size={16} className="text-emerald-600" />
+                            <span>Ropa Entregada</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`¿Deseas regresar la ropa de "${rec.customerName}" a En Almacén?`)) {
+                                updateDailyRecord(rec.id, { deliveryStatus: 'in_store', deliveredDate: null });
+                              }
+                            }}
+                            className="text-xs text-slate-500 underline font-medium hover:text-slate-800"
+                          >
+                            Deshacer
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          {rec.debtUSD > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRecordToPay(rec);
+                                setPayMethodSelect('usd_cash');
+                                setPayRefInput('');
+                                setPayModalOpen(true);
+                              }}
+                              className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+                            >
+                              <DollarSign size={15} />
+                              <span>Cobrar y Entregar</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                markRecordDelivered(rec.id);
+                                setInlineSuccessToast(`✅ ¡Ropa de "${rec.customerName}" entregada con éxito!`);
+                                setTimeout(() => setInlineSuccessToast(''), 3500);
+                              }}
+                              className="flex-1 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+                            >
+                              <Check size={16} />
+                              <span>Marcar Entregado</span>
+                            </button>
+                          )}
+                        </>
+                      )}
+
+                      {/* Botón WhatsApp directo si tiene teléfono */}
+                      {rec.customerPhone && (
+                        <button
+                          type="button"
+                          onClick={() => notifyCustomerWhatsApp(rec)}
+                          className="px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1 active:scale-95 transition-all"
+                          title="Avisar por WhatsApp que la ropa está lista"
+                        >
+                          <MessageCircle size={15} className="text-emerald-600" />
+                          <span>Avisar</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="bg-white p-8 rounded-3xl border border-blue-200 text-center text-slate-500 shadow-sm">
+                  <BookOpen size={36} className="mx-auto text-slate-300 mb-2" />
+                  <p className="font-bold text-slate-800">No hay registros para la fecha {selectedDate}.</p>
+                  <p className="text-xs text-slate-500 mt-1">Usa la barra superior para cargar el primer cliente del turno.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════════
+              VISTA 2: TABLA COMPLETA DEL CUADERNO FÍSICO
+              Visible en escritorio (sm:block) y en móvil si el usuario elige "Cuaderno Tabla"
+          ══════════════════════════════════════════════════════════════════ */}
+          <div className={`${mobileViewMode === 'table' ? 'block' : 'hidden sm:block'} bg-white rounded-3xl border border-blue-200/80 shadow-md w-full max-w-full`}>
+            <div className="sm:hidden px-3.5 py-2.5 bg-blue-50 text-xs text-blue-700 font-bold flex items-center justify-between border-b border-blue-100">
+              <span>👈 Desliza horizontalmente la tabla 👉</span>
+              <span className="font-mono">{filteredByOrigin.length} filas</span>
+            </div>
+            <div 
+              className="touch-scroll overflow-x-auto w-full max-w-full"
+              style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
+            >
+              <table className="w-full text-left text-xs min-w-[760px]">
+                <thead className="bg-slate-100/90 border-b border-slate-200 text-slate-700 font-extrabold uppercase tracking-wider">
                   <tr>
                     <th className="py-3 px-3">Hora</th>
                     <th className="py-3 px-4">Cliente / Origen</th>
@@ -1087,7 +1342,17 @@ export default function EmployeeWorkStation() {
                             )}
                           </div>
                           {rec.customerPhone && (
-                            <p className="text-[10px] text-slate-500 font-mono">{rec.customerPhone}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-slate-500 font-mono">{rec.customerPhone}</span>
+                              <button
+                                type="button"
+                                onClick={() => notifyCustomerWhatsApp(rec)}
+                                className="text-[10px] text-emerald-600 font-bold hover:underline flex items-center gap-0.5"
+                                title="Avisar por WhatsApp"
+                              >
+                                <MessageCircle size={10} /> Avisar
+                              </button>
+                            </div>
                           )}
                           {rec.notes && (
                             <p className="text-[10px] text-amber-700 font-medium italic mt-0.5">
