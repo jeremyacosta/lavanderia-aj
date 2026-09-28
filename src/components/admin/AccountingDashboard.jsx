@@ -863,7 +863,69 @@ export default function AccountingDashboard() {
 
             {/* Acciones si ya está conectado */}
             {isCloudConnected && (
-              <div className="space-y-3 pt-2">
+              <div className="space-y-4 pt-1">
+                {/* CAJA DE ENLACE MÁGICO PARA CONECTAR TELÉFONOS AL INSTANTE */}
+                <div className="p-4 rounded-2xl bg-blue-50 border-2 border-blue-300 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📲</span>
+                    <div>
+                      <h4 className="font-black text-slate-900 text-sm">
+                        Conectar Teléfonos con 1 Clic (Sin Escribir Claves)
+                      </h4>
+                      <p className="text-[11px] text-slate-600">
+                        Envía este enlace por WhatsApp a tu teléfono o al personal. Al abrirlo, el teléfono se conecta solo.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const saved = localStorage.getItem('aj_firebase_config');
+                        if (!saved) return;
+                        const cfg = JSON.parse(saved);
+                        const magicUrl = `${window.location.origin}/?sync_key=${encodeURIComponent(cfg.apiKey)}&sync_proj=${encodeURIComponent(cfg.projectId)}`;
+                        navigator.clipboard.writeText(magicUrl);
+                        setCloudSyncStatusMsg('📋 ¡Enlace copiado al portapapeles! Pégalo en el navegador de tu teléfono.');
+                        setTimeout(() => setCloudSyncStatusMsg(''), 5000);
+                      }}
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                    >
+                      <span>📋 Copiar Enlace para Teléfonos</span>
+                    </button>
+
+                    <a
+                      href={`https://wa.me/?text=${encodeURIComponent(
+                        '🧼 *ENLACE DE CONEXIÓN - LAVANDERÍA AJ*\n' +
+                        'Abre este enlace en el navegador de tu teléfono para conectar la base de datos en vivo con la laptop:\n\n' +
+                        (() => {
+                          const saved = localStorage.getItem('aj_firebase_config');
+                          if (!saved) return window.location.origin;
+                          const cfg = JSON.parse(saved);
+                          return `${window.location.origin}/?sync_key=${encodeURIComponent(cfg.apiKey)}&sync_proj=${encodeURIComponent(cfg.projectId)}`;
+                        })()
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                    >
+                      <span>💬 Enviar por WhatsApp al Teléfono</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* AVISO IMPORTANTE DE REGLAS DE FIRESTORE */}
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs space-y-1">
+                  <p className="font-black text-amber-950 flex items-center gap-1.5">
+                    <span>⚠️ ¿Ya abriste el enlace en el teléfono pero no ves los tickets?</span>
+                  </p>
+                  <p className="text-[11px] leading-relaxed">
+                    Entra a <strong>console.firebase.google.com</strong> &gt; tu proyecto &gt; <strong>Firestore Database</strong> &gt; pestaña <strong>Reglas (Rules)</strong>.
+                    Verifica que diga: <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold text-amber-950">allow read, write: if true;</code> y haz clic en <strong>Publicar (Publish)</strong>. Si dice <code>if false;</code>, Google bloquea la conexión.
+                  </p>
+                </div>
+
                 <button
                   type="button"
                   disabled={isUploadingLocal}

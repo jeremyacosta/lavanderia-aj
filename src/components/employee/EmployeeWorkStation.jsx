@@ -20,7 +20,8 @@ export default function EmployeeWorkStation() {
     detergentLogs, 
     addDetergentLog, 
     dailyClosures, 
-    saveDailyClosure, 
+    saveDailyClosure,
+    isCloudConnected,
     exchangeRate,
     euroRate,
     bcvLastUpdated,
@@ -588,9 +589,22 @@ export default function EmployeeWorkStation() {
       {/* Top Banner de Personal LAV */}
       <div className="rounded-3xl bg-gradient-to-r from-blue-900 via-blue-950 to-slate-900 p-4 sm:p-6 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-blue-800 w-full max-w-full overflow-hidden">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2 border border-cyan-500/30">
-            <BookOpen size={14} className="text-cyan-400" />
-            <span>Puesto de Trabajo · Personal LAV</span>
+          <div className="flex items-center gap-2 flex-wrap mb-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-cyan-300 text-xs font-bold uppercase tracking-wider border border-cyan-500/30">
+              <BookOpen size={14} className="text-cyan-400" />
+              <span>Puesto de Trabajo · Personal LAV</span>
+            </div>
+            {isCloudConnected ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/30 text-emerald-300 text-xs font-black border border-emerald-400/40 shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>🟢 Nube Activa (Sincronizado)</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/30 text-amber-300 text-xs font-black border border-amber-400/40">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span>🟡 Modo Local (Sin sincronizar con laptop)</span>
+              </span>
+            )}
           </div>
           <h1 className="text-xl sm:text-3xl font-black tracking-tight">
             Gestión Diaria de Clientes y Caja

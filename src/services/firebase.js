@@ -71,6 +71,11 @@ export async function syncDocToCloud(collectionName, docId, data) {
     return true;
   } catch (err) {
     console.error(`[Firebase Write Error ${collectionName}/${docId}]:`, err);
+    if (err?.code === 'permission-denied') {
+      window.dispatchEvent(new CustomEvent('aj_firebase_error', {
+        detail: 'Permiso denegado en Firebase. Debes ir a Firebase Console > Firestore Database > Reglas y poner: allow read, write: if true; y luego Publicar.'
+      }));
+    }
     return false;
   }
 }

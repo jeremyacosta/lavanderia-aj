@@ -48,6 +48,41 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
+  const [magicSyncAlert, setMagicSyncAlert] = useState('');
+  const [fbErrorBanner, setFbErrorBanner] = useState('');
+
+  // Detección de Enlace Mágico de Sincronización para Teléfonos (?sync_key=...&sync_proj=...)
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const syncKey = urlParams.get('sync_key');
+      const syncProj = urlParams.get('sync_proj');
+      if (syncKey && syncProj) {
+        const config = {
+          apiKey: syncKey,
+          projectId: syncProj,
+          authDomain: `${syncProj}.firebaseapp.com`,
+          storageBucket: `${syncProj}.firebasestorage.app`,
+          messagingSenderId: '',
+          appId: ''
+        };
+        localStorage.setItem('aj_firebase_config', JSON.stringify(config));
+        setMagicSyncAlert(`✅ ¡Teléfono conectado a la base de datos de Lavandería AJ (${syncProj})! Recargando para activar...`);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setTimeout(() => {
+          window.location.reload();
+        }, 1200);
+      }
+    } catch (e) {
+      console.warn('Error reading sync URL params:', e);
+    }
+
+    const handleFbErr = (e) => {
+      setFbErrorBanner(e.detail);
+    };
+    window.addEventListener('aj_firebase_error', handleFbErr);
+    return () => window.removeEventListener('aj_firebase_error', handleFbErr);
+  }, []);
   const [currentView, setCurrentView] = useState('client'); // 'client' | 'admin_accounting' | 'admin_machines' | 'admin_crm'
   const [adminAuth, setAdminAuth] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -109,6 +144,19 @@ export default function App() {
     <AppProvider>
       <div className="min-h-screen bg-[#EEF5FB] text-slate-900 flex flex-col justify-between selection:bg-blue-500 selection:text-white">
         
+        {/* Alerta de Sincronización Mágica o Error de Reglas */}
+        {magicSyncAlert && (
+          <div className="bg-emerald-600 text-white py-3 px-4 text-center text-xs sm:text-sm font-black shadow-md flex items-center justify-center gap-2">
+            <span>{magicSyncAlert}</span>
+          </div>
+        )}
+        {fbErrorBanner && (
+          <div className="bg-red-600 text-white py-3 px-4 text-center text-xs sm:text-sm font-bold shadow-md flex items-center justify-between gap-2">
+            <span>⚠️ {fbErrorBanner}</span>
+            <button onClick={() => setFbErrorBanner('')} className="bg-white/20 px-2 py-0.5 rounded text-xs font-black">✕</button>
+          </div>
+        )}
+
         {/* Top Slogan Banner */}
         <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 text-white py-2 px-3 text-center text-xs sm:text-sm font-black tracking-wide shadow-xs flex items-center justify-center gap-1.5 leading-tight">
           <Sparkles size={14} className="text-amber-300 shrink-0" />
