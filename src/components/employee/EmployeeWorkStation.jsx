@@ -63,6 +63,7 @@ export default function EmployeeWorkStation() {
   const [inlinePayMethod, setInlinePayMethod] = useState('usd_cash'); // 'usd_cash' | 'pago_movil' | 'bs_cash' | 'pending'
   const [inlineBankRef, setInlineBankRef] = useState('');
   const [inlineNotes, setInlineNotes] = useState('');
+  const [inlineServiceType, setInlineServiceType] = useState('combo'); // 'combo' | 'lavado_jabon' | 'solo_secado' | 'edredon_ind' | 'edredon_mat' | 'edredon_grande' | 'forros_bus' | 'custom'
   const [inlineSuccessToast, setInlineSuccessToast] = useState('');
 
   // Modal de Edición Rápida de Servicios/Cestas de un Ticket existente
@@ -250,46 +251,169 @@ export default function EmployeeWorkStation() {
     window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
   };
 
-  // Recalcular monto en la barra rápida manteniendo el modo USD o Bs
-  const updateInlineAmount = (baskets, bleach, degreaser, customBaseUSD = null) => {
-    const unit = prices.comboFull || 7.50;
-    const bPrice = prices.bleach || 0.50;
-    const dPrice = prices.degreaser || 0.50;
-    const base = customBaseUSD !== null ? customBaseUSD : (baskets * unit);
-    const extras = (bleach * bPrice) + (degreaser * dPrice);
-    const totalUSD = (base + extras).toFixed(2);
-    const rate = exchangeRate || 40.50;
-    if (inlineCurrencyMode === 'BS') {
-      setInlineAmountUSD((parseFloat(totalUSD) * rate).toFixed(2));
-    } else {
-      setInlineAmountUSD(totalUSD);
+  // Cálculo de precio flexible y justo considerando operaciones exactas
+  const calculateFlexibleServicePrice = (wash, dry, soap, labor, softener, bleach, degreaser, serviceType = 'custom') => {
+    const comboPrice = prices.comboFull || 7.50;
+    const washPrice = prices.washOnly || 4.50;
+    const dryPrice = prices.dryOnly || 3.00;
+    const bleachPrice = prices.bleach || 0.50;
+    const degreaserPrice = prices.degreaser || 0.50;
+
+    const extras = (bleach * bleachPrice) + (degreaser * degreaserPrice);
+
+    if (serviceType === 'edredon_ind') return (wash * (prices.edredonInd || 10.00)) + extras;
+    if (serviceType === 'edredon_mat') return (wash * (prices.edredonMat || 12.00)) + extras;
+    if (serviceType === 'edredon_grande') return (wash * (prices.edredonGrande || 14.00)) + extras;
+    if (serviceType === 'forros_bus') return (Math.max(1, Math.round(wash / 4)) * (prices.forrosBus || 32.00)) + extras;
+
+    // Si es solo lavado sin secado
+    if (wash > 0 && dry === 0) {
+      return (wash * washPrice) + extras;
     }
+    // Si es solo secado sin lavado
+    if (wash === 0 && dry > 0) {
+      return (dry * dryPrice) + extras;
+    }
+    // Si la cantidad de lavado y secado es exactamente igual
+    if (wash === dry && wash > 0) {
+      return (wash * comboPrice) + extras;
+    }
+    // Si se lavan más cestas de las que se secan (ej: 3 lavados, 2 secados => 2 combos completos + 1 solo lavado)
+    if (wash > dry) {
+      const combos = dry;
+      const extraWashOnly = wash - dry;
+      return (combos * comboPrice) + (extraWashOnly * washPrice) + extras;
+    }
+    // Si se secan más cestas de las que se lavan (ej: 2 lavados, 3 secados => 2 combos completos + 1 solo secado)
+    if (dry > wash) {
+      const combos = wash;
+      const extraDryOnly = dry - wash;
+      return (combos * comboPrice) + (extraDryOnly * dryPrice) + extras;
+    }
+    return extras;
   };
 
-  // Cambio dinámico de cestas y sincronización de servicios para carga rápida
+  // Sincronizar monto y notas de la barra rápida según los servicios activos
+  const syncInlineState = (newWash, newDry, newSoap, newLabor, newSoftener, newBleach, newDegreaser, newType, basketsCount) => {
+    const rate = exchangeRate || 40.50;
+    const totalUSD = calculateFlexibleServicePrice(newWash, newDry, newSoap, newLabor, newSoftener, newBleach, newDegreaser, newType);
+    const totalUSDStr = totalUSD.toFixed(2);
+    
+    if (inlineCurrencyMode === 'BS') {
+      setInlineAmountUSD((totalUSD * rate).toFixed(2));
+    } else {
+      setInlineAmountUSD(totalUSDStr);
+    }
+
+    // Generar descripción clara del ticket
+    let desc = '';
+    if (newType === 'edredon_ind') desc = `${basketsCount} Edredón(es) Individual ($10.00 c/u)`;
+    else if (newType === 'edredon_mat') desc = `${basketsCount} Edredón(es) Matrimonial ($12.00 c/u)`;
+    else if (newType === 'edredon_grande') desc = `${basketsCount} Edredón(es) Grande ($14.00 c/u)`;
+    else if (newType === 'forros_bus') desc = `${basketsCount} Juego(s) Forros de Autobús ($32.00 c/u)`;
+    else if (newDry === 0 && newWash > 0) desc = `${newWash} Cesta(s) Solo Lavado + Jabón ($4.50 c/u)`;
+    else if (newWash === 0 && newDry > 0) desc = `${newDry} Cesta(s) Solo Secado ($3.00 c/u)`;
+    else if (newWash === newDry) desc = `${newWash} Cesta(s) Combo Completo ($7.50 c/u)`;
+    else desc = `${Math.max(newWash, newDry)} Cesta(s) (${newWash} lav, ${newDry} sec)`;
+
+    if (newBleach > 0) desc += ` + ${newBleach} Cloro`;
+    if (newDegreaser > 0) desc += ` + ${newDegreaser} Desengrasante`;
+
+    setInlineNotes(desc);
+  };
+
+  // Cambio del tipo de servicio predeterminado (Combo, Solo Lavado, Solo Secado, Edredones, etc.)
+  const selectInlineServiceType = (type, count = inlineBaskets) => {
+    setInlineServiceType(type);
+    const baskets = Math.max(1, count);
+    setInlineBaskets(baskets);
+
+    let w = baskets, d = baskets, j = baskets, mo = baskets, su = baskets;
+    if (type === 'lavado_jabon') {
+      w = baskets; d = 0; j = baskets; mo = baskets; su = 0;
+    } else if (type === 'solo_secado') {
+      w = 0; d = baskets; j = 0; mo = baskets; su = 0;
+    } else if (type === 'forros_bus') {
+      w = baskets * 4; d = baskets * 4; j = baskets * 4; mo = baskets * 4; su = baskets * 4;
+    }
+
+    setInlineWashCount(w);
+    setInlineDryCount(d);
+    setInlineSoapCount(j);
+    setInlineLaborCount(mo);
+    setInlineSoftenerCount(su);
+
+    syncInlineState(w, d, j, mo, su, inlineBleachCount, inlineDegreaserCount, type, baskets);
+  };
+
+  // Cambio dinámico de cestas respetando estrictamente el tipo de servicio seleccionado
   const handleInlineBasketsChange = (newCount) => {
-    const val = Math.max(1, newCount);
-    setInlineBaskets(val);
-    setInlineWashCount(val);
-    setInlineDryCount(val);
-    setInlineSoapCount(val);
-    setInlineLaborCount(val);
-    setInlineSoftenerCount(val);
-    updateInlineAmount(val, inlineBleachCount, inlineDegreaserCount);
+    const count = Math.max(1, newCount);
+    setInlineBaskets(count);
+
+    let w = count, d = count, j = count, mo = count, su = count;
+    if (inlineServiceType === 'lavado_jabon') {
+      w = count; d = 0; j = count; mo = count; su = 0;
+    } else if (inlineServiceType === 'solo_secado') {
+      w = 0; d = count; j = 0; mo = count; su = 0;
+    } else if (inlineServiceType === 'forros_bus') {
+      w = count * 4; d = count * 4; j = count * 4; mo = count * 4; su = count * 4;
+    } else if (inlineServiceType === 'custom') {
+      w = count;
+      d = Math.min(count, inlineDryCount);
+      j = count;
+      mo = count;
+      su = d;
+    }
+
+    setInlineWashCount(w);
+    setInlineDryCount(d);
+    setInlineSoapCount(j);
+    setInlineLaborCount(mo);
+    setInlineSoftenerCount(su);
+
+    syncInlineState(w, d, j, mo, su, inlineBleachCount, inlineDegreaserCount, inlineServiceType, count);
   };
 
-  // Sumar o restar Cloro en la barra rápida (+/- $0.50)
+  // Modificar operaciones individuales (Lavado, Secado, Jabón, etc.) permitiendo restar o sumar secado libremente
+  const handleInlineServiceCountChange = (serviceKey, delta) => {
+    let w = inlineWashCount;
+    let d = inlineDryCount;
+    let j = inlineSoapCount;
+    let mo = inlineLaborCount;
+    let su = inlineSoftenerCount;
+    let cl = inlineBleachCount;
+    let de = inlineDegreaserCount;
+
+    if (serviceKey === 'wash') w = Math.max(0, w + delta);
+    if (serviceKey === 'dry') d = Math.max(0, d + delta);
+    if (serviceKey === 'soap') j = Math.max(0, j + delta);
+    if (serviceKey === 'labor') mo = Math.max(0, mo + delta);
+    if (serviceKey === 'softener') su = Math.max(0, su + delta);
+    if (serviceKey === 'bleach') cl = Math.max(0, cl + delta);
+    if (serviceKey === 'degreaser') de = Math.max(0, de + delta);
+
+    setInlineWashCount(w);
+    setInlineDryCount(d);
+    setInlineSoapCount(j);
+    setInlineLaborCount(mo);
+    setInlineSoftenerCount(su);
+    setInlineBleachCount(cl);
+    setInlineDegreaserCount(de);
+
+    const maxBaskets = Math.max(1, w, d);
+    setInlineBaskets(maxBaskets);
+    setInlineServiceType('custom');
+
+    syncInlineState(w, d, j, mo, su, cl, de, 'custom', maxBaskets);
+  };
+
   const handleInlineBleachChange = (delta) => {
-    const nextVal = Math.max(0, inlineBleachCount + delta);
-    setInlineBleachCount(nextVal);
-    updateInlineAmount(inlineBaskets, nextVal, inlineDegreaserCount);
+    handleInlineServiceCountChange('bleach', delta);
   };
 
-  // Sumar o restar Desengrasante en la barra rápida (+/- $0.50)
   const handleInlineDegreaserChange = (delta) => {
-    const nextVal = Math.max(0, inlineDegreaserCount + delta);
-    setInlineDegreaserCount(nextVal);
-    updateInlineAmount(inlineBaskets, inlineBleachCount, nextVal);
+    handleInlineServiceCountChange('degreaser', delta);
   };
 
   // Modificar servicios en el modal detallado recalculando el monto en vivo
@@ -399,24 +523,19 @@ export default function EmployeeWorkStation() {
     let finalBleach = inlineBleachCount;
     let finalDegreaser = inlineDegreaserCount;
 
-    // Detección inteligente: si el usuario no tocó los contadores pero el monto coincide con múltiplos exactos de cesta ($7.50 c/u)
-    const unitPrice = prices.comboFull || 7.50;
-    if (inlineBaskets === 1 && inlineWashCount === 1 && inlineDryCount === 1 && numUSD >= 14) {
-      const estimatedBaskets = Math.round(numUSD / unitPrice);
-      if (estimatedBaskets >= 2 && Math.abs(numUSD - (estimatedBaskets * unitPrice)) < 1.0) {
-        finalWash = estimatedBaskets;
-        finalDry = estimatedBaskets;
-        finalSoap = estimatedBaskets;
-        finalLabor = estimatedBaskets;
-        finalSoftener = estimatedBaskets;
-      }
-    }
-
     let notesText = inlineNotes.trim();
     if (!notesText) {
-      notesText = `${finalWash} Cesta(s) (${finalWash} lav, ${finalDry} sec)`;
-      if (finalBleach > 0) notesText += ` + ${finalBleach} Cloro ($${(finalBleach * 0.50).toFixed(2)})`;
-      if (finalDegreaser > 0) notesText += ` + ${finalDegreaser} Desengrasante ($${(finalDegreaser * 0.50).toFixed(2)})`;
+      if (finalDry === 0 && finalWash > 0) {
+        notesText = `${finalWash} Cesta(s) (Solo Lavado + Jabón)`;
+      } else if (finalWash === 0 && finalDry > 0) {
+        notesText = `${finalDry} Cesta(s) (Solo Secado)`;
+      } else if (finalWash === finalDry) {
+        notesText = `${finalWash} Cesta(s) (${finalWash} lav, ${finalDry} sec)`;
+      } else {
+        notesText = `${Math.max(finalWash, finalDry)} Cesta(s) (${finalWash} lav, ${finalDry} sec)`;
+      }
+      if (finalBleach > 0) notesText += ` + ${finalBleach} Cloro`;
+      if (finalDegreaser > 0) notesText += ` + ${finalDegreaser} Desengrasante`;
     }
 
     addDailyRecord({
@@ -463,6 +582,7 @@ export default function EmployeeWorkStation() {
     setInlineBankRef('');
     setInlineNotes('');
     setInlinePayMethod('usd_cash');
+    setInlineServiceType('combo');
     setOriginFilter('all');
   };
 
@@ -1101,273 +1221,301 @@ export default function EmployeeWorkStation() {
                 </div>
               </div>
 
-              {/* Fila de Adicionales por Cesta en Barra Rápida */}
-              <div className="flex flex-wrap items-center justify-between gap-2.5 bg-blue-50/80 border border-blue-200/90 px-3.5 py-2.5 rounded-2xl">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black shrink-0">
-                    🧪
+              {/* Selector de Tipo de Servicio (Presets) */}
+              <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <span className="text-[11px] font-black text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                    <span>⚡ Servicio Base:</span>
+                    <span className="text-[10px] font-normal text-slate-400">({inlineBaskets} cesta{inlineBaskets > 1 ? 's' : ''})</span>
                   </span>
-                  <div>
-                    <span className="text-xs font-black text-blue-950 block leading-tight">
-                      Adicionales a elección por cesta:
+                  {inlineServiceType === 'custom' && (
+                    <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300">
+                      🛠️ Personalizado libre
                     </span>
-                    <span className="text-[11px] text-slate-500 block leading-none mt-0.5">
-                      Suma o resta cloro o desengrasante solo a las cestas que lo requieran (+$0.50 c/u)
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  {/* Cloro Stepper */}
-                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
-                    inlineBleachCount > 0 
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                      : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300'
-                  }`}>
-                    <span className="text-xs font-extrabold flex items-center gap-1">
-                      <span>🧪 Cloro:</span>
-                      <span className={`text-[10px] font-black px-1 rounded ${inlineBleachCount > 0 ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-700'}`}>
-                        {inlineBleachCount > 0 ? `+$${(inlineBleachCount * 0.50).toFixed(2)}` : '+$0.50'}
-                      </span>
-                    </span>
-                    <div className="flex items-center gap-1 ml-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleInlineBleachChange(-1)}
-                        className={`w-6 h-6 rounded-lg font-black text-sm flex items-center justify-center transition-colors active:scale-95 ${
-                          inlineBleachCount > 0 ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                        }`}
-                        title="Restar cloro"
-                      >
-                        -
-                      </button>
-                      <span className="font-mono font-black text-xs w-5 text-center select-none">
-                        {inlineBleachCount}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleInlineBleachChange(+1)}
-                        className={`w-6 h-6 rounded-lg font-black text-sm flex items-center justify-center transition-colors active:scale-95 ${
-                          inlineBleachCount > 0 ? 'bg-white hover:bg-blue-50 text-blue-700' : 'bg-blue-600 hover:bg-blue-700 text-white'
-                        }`}
-                        title="Sumar cloro (+$0.50)"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Desengrasante Stepper */}
-                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
-                    inlineDegreaserCount > 0 
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                      : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300'
-                  }`}>
-                    <span className="text-xs font-extrabold flex items-center gap-1">
-                      <span>🧽 Desengrasante:</span>
-                      <span className={`text-[10px] font-black px-1 rounded ${inlineDegreaserCount > 0 ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-700'}`}>
-                        {inlineDegreaserCount > 0 ? `+$${(inlineDegreaserCount * 0.50).toFixed(2)}` : '+$0.50'}
-                      </span>
-                    </span>
-                    <div className="flex items-center gap-1 ml-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleInlineDegreaserChange(-1)}
-                        className={`w-6 h-6 rounded-lg font-black text-sm flex items-center justify-center transition-colors active:scale-95 ${
-                          inlineDegreaserCount > 0 ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                        }`}
-                        title="Restar desengrasante"
-                      >
-                        -
-                      </button>
-                      <span className="font-mono font-black text-xs w-5 text-center select-none">
-                        {inlineDegreaserCount}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleInlineDegreaserChange(+1)}
-                        className={`w-6 h-6 rounded-lg font-black text-sm flex items-center justify-center transition-colors active:scale-95 ${
-                          inlineDegreaserCount > 0 ? 'bg-white hover:bg-blue-50 text-blue-700' : 'bg-blue-600 hover:bg-blue-700 text-white'
-                        }`}
-                        title="Sumar desengrasante (+$0.50)"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Botón limpiar adicionales */}
-                  {(inlineBleachCount > 0 || inlineDegreaserCount > 0) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInlineBleachCount(0);
-                        setInlineDegreaserCount(0);
-                        updateInlineAmount(inlineBaskets, 0, 0);
-                      }}
-                      className="text-[11px] font-bold text-red-600 hover:underline px-1.5 py-0.5"
-                    >
-                      Limpiar adicionales
-                    </button>
                   )}
                 </div>
-              </div>
 
-              {/* Atajos Rápidos de Carga y Desglose Visual */}
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">Carga Rápida:</span>
                   <button
                     type="button"
-                    onClick={() => {
-                      handleInlineBasketsChange(1);
-                      setInlineNotes('1 Cesta Combo ($7.50)');
-                    }}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold border transition-all ${inlineBaskets === 1 && inlineDryCount === 1 ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
+                    onClick={() => selectInlineServiceType('combo')}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                      inlineServiceType === 'combo'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-blue-50/70 hover:bg-blue-100 text-blue-900 border-blue-200'
+                    }`}
                   >
-                    🧺 1 Cesta ($7.50)
+                    ⭐ Combo Completo ($7.50)
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      handleInlineBasketsChange(2);
-                      setInlineNotes('2 Cestas Combo ($15.00)');
-                    }}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold border transition-all ${inlineBaskets === 2 && inlineDryCount === 2 ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
+                    onClick={() => selectInlineServiceType('lavado_jabon')}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                      inlineServiceType === 'lavado_jabon'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200'
+                    }`}
                   >
-                    🧺🧺 2 Cestas ($15.00)
+                    🫧 Solo Lavado + Jabón ($4.50)
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      handleInlineBasketsChange(3);
-                      setInlineNotes('3 Cestas Combo ($22.50)');
-                    }}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold border transition-all ${inlineBaskets === 3 && inlineDryCount === 3 ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
-                  >
-                    🧺x3 3 Cestas ($22.50)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleInlineBasketsChange(4);
-                      setInlineNotes('4 Cestas Combo ($30.00)');
-                    }}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold border transition-all ${inlineBaskets === 4 && inlineDryCount === 4 ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
-                  >
-                    🧺x4 4 Cestas ($30.00)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setInlineBaskets(1);
-                      setInlineWashCount(1);
-                      setInlineDryCount(0);
-                      setInlineSoapCount(1);
-                      setInlineLaborCount(1);
-                      setInlineSoftenerCount(0);
-                      updateInlineAmount(1, inlineBleachCount, inlineDegreaserCount, 4.50);
-                      setInlineNotes('Solo Lavado + Jabón ($4.50)');
-                    }}
-                    className="px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold border border-slate-200"
-                  >
-                    🫧 Lavado + Jabón ($4.50)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setInlineBaskets(1);
-                      setInlineWashCount(0);
-                      setInlineDryCount(1);
-                      setInlineSoapCount(0);
-                      setInlineLaborCount(1);
-                      setInlineSoftenerCount(0);
-                      updateInlineAmount(1, inlineBleachCount, inlineDegreaserCount, 3.00);
-                      setInlineNotes('Solo Secado ($3.00)');
-                    }}
-                    className="px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold border border-slate-200"
+                    onClick={() => selectInlineServiceType('solo_secado')}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                      inlineServiceType === 'solo_secado'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200'
+                    }`}
                   >
                     💨 Solo Secado ($3.00)
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setInlineBaskets(1);
-                      setInlineWashCount(1);
-                      setInlineDryCount(1);
-                      setInlineSoapCount(1);
-                      setInlineLaborCount(1);
-                      setInlineSoftenerCount(1);
-                      updateInlineAmount(1, inlineBleachCount, inlineDegreaserCount, 10.00);
-                      setInlineNotes('Edredón Individual ($10.00)');
-                    }}
-                    className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200"
+                    onClick={() => selectInlineServiceType('edredon_ind')}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                      inlineServiceType === 'edredon_ind'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200'
+                    }`}
                   >
                     🛏️ Edredón Ind ($10)
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setInlineBaskets(1);
-                      setInlineWashCount(1);
-                      setInlineDryCount(1);
-                      setInlineSoapCount(1);
-                      setInlineLaborCount(1);
-                      setInlineSoftenerCount(1);
-                      updateInlineAmount(1, inlineBleachCount, inlineDegreaserCount, 12.00);
-                      setInlineNotes('Edredón Matrimonial ($12.00)');
-                    }}
-                    className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200"
+                    onClick={() => selectInlineServiceType('edredon_mat')}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                      inlineServiceType === 'edredon_mat'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200'
+                    }`}
                   >
                     🛏️ Edredón Mat ($12)
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setInlineBaskets(1);
-                      setInlineWashCount(1);
-                      setInlineDryCount(1);
-                      setInlineSoapCount(1);
-                      setInlineLaborCount(1);
-                      setInlineSoftenerCount(1);
-                      updateInlineAmount(1, inlineBleachCount, inlineDegreaserCount, 14.00);
-                      setInlineNotes('Edredón Grande ($14.00)');
-                    }}
-                    className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200"
+                    onClick={() => selectInlineServiceType('edredon_grande')}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                      inlineServiceType === 'edredon_grande'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200'
+                    }`}
                   >
                     🛏️ Edredón Grande ($14)
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setInlineBaskets(4);
-                      setInlineWashCount(4);
-                      setInlineDryCount(4);
-                      setInlineSoapCount(4);
-                      setInlineLaborCount(4);
-                      setInlineSoftenerCount(4);
-                      updateInlineAmount(4, inlineBleachCount, inlineDegreaserCount, 32.00);
-                      setInlineNotes('Forros de Autobús ($32.00)');
-                    }}
-                    className="px-2.5 py-1 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 text-xs font-bold border border-cyan-200"
+                    onClick={() => selectInlineServiceType('forros_bus')}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                      inlineServiceType === 'forros_bus'
+                        ? 'bg-cyan-600 text-white border-cyan-600 shadow-sm'
+                        : 'bg-cyan-50 hover:bg-cyan-100 text-cyan-900 border-cyan-200'
+                    }`}
                   >
                     🚌 Forros Bus ($32)
                   </button>
                 </div>
+              </div>
 
-                {/* Desglose visual interactivo de servicios que se guardarán en el Cuaderno */}
-                <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-2xl text-xs font-bold text-slate-700">
-                  <span className="text-[11px] text-slate-500 mr-0.5">Se anotará:</span>
-                  <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">🫧 L: {inlineWashCount}</span>
-                  <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">💨 S: {inlineDryCount}</span>
-                  <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">🧼 J: {inlineSoapCount}</span>
-                  <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">✋ MO: {inlineLaborCount}</span>
-                  <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-purple-700 font-black">🌸 Suav: {inlineSoftenerCount}</span>
-                  {inlineBleachCount > 0 && (
-                    <span className="bg-cyan-50 px-2 py-0.5 rounded-lg border border-cyan-300 text-cyan-800 font-black">🧪 Cloro: {inlineBleachCount}</span>
+              {/* Barra de Ajuste Libre de Operaciones (Sumar o restar Secado, Lavado, Jabón, etc.) */}
+              <div className="flex flex-col gap-2 bg-slate-50 border border-slate-200 p-3 rounded-2xl">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-black text-slate-800">
+                    <span>🎛️ Operaciones del Ticket</span>
+                    <span className="text-[11px] font-normal text-slate-500">
+                      (Suma o resta secado, lavado o adicionales a voluntad):
+                    </span>
+                  </div>
+                  {(inlineWashCount !== inlineDryCount || inlineBleachCount > 0 || inlineDegreaserCount > 0 || inlineServiceType === 'custom') && (
+                    <button
+                      type="button"
+                      onClick={() => selectInlineServiceType('combo', inlineBaskets)}
+                      className="text-[11px] font-bold text-blue-600 hover:underline"
+                    >
+                      Restablecer al combo base
+                    </button>
                   )}
-                  {inlineDegreaserCount > 0 && (
-                    <span className="bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-300 text-amber-800 font-black">🧽 Deseng: {inlineDegreaserCount}</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                  {/* Stepper Lavado */}
+                  <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border transition-all ${
+                    inlineWashCount > 0 ? 'bg-white border-blue-300 text-slate-900 shadow-2xs' : 'bg-slate-100 border-slate-200 text-slate-400'
+                  }`}>
+                    <span className="text-xs font-bold mr-1">🫧 Lav:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineServiceCountChange('wash', -1)}
+                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Restar un lavado"
+                    >
+                      -
+                    </button>
+                    <span className="font-mono font-black text-xs w-5 text-center select-none text-blue-700">
+                      {inlineWashCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineServiceCountChange('wash', +1)}
+                      className="w-6 h-6 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Sumar un lavado"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Stepper Secado (Permite restar secado si una cesta no se seca) */}
+                  <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border transition-all ${
+                    inlineDryCount > 0 ? 'bg-white border-blue-300 text-slate-900 shadow-2xs' : 'bg-amber-50 border-amber-300 text-amber-900'
+                  }`}>
+                    <span className="text-xs font-bold mr-1">💨 Sec:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineServiceCountChange('dry', -1)}
+                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Restar un secado (ej: para cestas que solo se lavan)"
+                    >
+                      -
+                    </button>
+                    <span className={`font-mono font-black text-xs w-5 text-center select-none ${inlineDryCount === 0 ? 'text-amber-700' : 'text-blue-700'}`}>
+                      {inlineDryCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineServiceCountChange('dry', +1)}
+                      className="w-6 h-6 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Sumar un secado"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Stepper Jabón */}
+                  <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border transition-all ${
+                    inlineSoapCount > 0 ? 'bg-white border-blue-300 text-slate-900 shadow-2xs' : 'bg-slate-100 border-slate-200 text-slate-400'
+                  }`}>
+                    <span className="text-xs font-bold mr-1">🧼 Jab:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineServiceCountChange('soap', -1)}
+                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Restar jabón"
+                    >
+                      -
+                    </button>
+                    <span className="font-mono font-black text-xs w-5 text-center select-none text-blue-700">
+                      {inlineSoapCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineServiceCountChange('soap', +1)}
+                      className="w-6 h-6 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Sumar jabón"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Stepper Suavizante */}
+                  <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border transition-all ${
+                    inlineSoftenerCount > 0 ? 'bg-white border-purple-300 text-purple-950 shadow-2xs' : 'bg-slate-100 border-slate-200 text-slate-400'
+                  }`}>
+                    <span className="text-xs font-bold mr-1">🌸 Suav:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineServiceCountChange('softener', -1)}
+                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Restar suavizante"
+                    >
+                      -
+                    </button>
+                    <span className="font-mono font-black text-xs w-5 text-center select-none text-purple-700">
+                      {inlineSoftenerCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineServiceCountChange('softener', +1)}
+                      className="w-6 h-6 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Sumar suavizante"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Stepper Cloro */}
+                  <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border transition-all ${
+                    inlineBleachCount > 0 ? 'bg-cyan-50 border-cyan-400 text-cyan-950 shadow-2xs' : 'bg-white border-slate-200 text-slate-700'
+                  }`}>
+                    <span className="text-xs font-bold mr-1">🧪 Cloro:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineBleachChange(-1)}
+                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Restar cloro"
+                    >
+                      -
+                    </button>
+                    <span className="font-mono font-black text-xs w-5 text-center select-none text-cyan-800">
+                      {inlineBleachCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineBleachChange(+1)}
+                      className="w-6 h-6 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Sumar cloro (+$0.50)"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Stepper Desengrasante */}
+                  <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border transition-all ${
+                    inlineDegreaserCount > 0 ? 'bg-amber-50 border-amber-400 text-amber-950 shadow-2xs' : 'bg-white border-slate-200 text-slate-700'
+                  }`}>
+                    <span className="text-xs font-bold mr-1">🧽 Deseng:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineDegreaserChange(-1)}
+                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Restar desengrasante"
+                    >
+                      -
+                    </button>
+                    <span className="font-mono font-black text-xs w-5 text-center select-none text-amber-800">
+                      {inlineDegreaserCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleInlineDegreaserChange(+1)}
+                      className="w-6 h-6 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                      title="Sumar desengrasante (+$0.50)"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* Resumen dinámico que se guardará en el Cuaderno */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/80 text-xs">
+                  <div className="flex flex-wrap items-center gap-1.5 font-bold text-slate-700">
+                    <span className="text-[11px] text-slate-500 mr-0.5">Se anotará:</span>
+                    <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">🫧 L: {inlineWashCount}</span>
+                    <span className={`px-2 py-0.5 rounded-lg border font-black ${inlineDryCount === 0 ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-white border-slate-200 text-blue-700'}`}>
+                      💨 S: {inlineDryCount}
+                    </span>
+                    <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">🧼 J: {inlineSoapCount}</span>
+                    <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-blue-700 font-black">✋ MO: {inlineLaborCount}</span>
+                    <span className="bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-purple-700 font-black">🌸 Suav: {inlineSoftenerCount}</span>
+                    {inlineBleachCount > 0 && (
+                      <span className="bg-cyan-100 px-2 py-0.5 rounded-lg border border-cyan-300 text-cyan-900 font-black">🧪 Cl: {inlineBleachCount}</span>
+                    )}
+                    {inlineDegreaserCount > 0 && (
+                      <span className="bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 text-amber-900 font-black">🧽 Des: {inlineDegreaserCount}</span>
+                    )}
+                  </div>
+                  {inlineWashCount !== inlineDryCount && (
+                    <span className="text-[11px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-lg">
+                      {inlineWashCount > inlineDryCount ? `⚠️ ${inlineWashCount - inlineDryCount} cesta(s) sin secar` : `⚠️ ${inlineDryCount - inlineWashCount} secado(s) adicional(es)`}
+                    </span>
                   )}
                 </div>
               </div>

@@ -39,22 +39,48 @@ const DEFAULT_MACHINES = [
 // Función para asegurar que las cantidades de servicios correspondan fielmente a las cestas
 export function normalizeRecordServices(r) {
   if (!r) return r;
-  let wash = Number(r.washCount);
-  let dry = Number(r.dryCount);
-  let soap = Number(r.soapCount);
-  let labor = Number(r.laborCount);
-  let softener = Number(r.softenerCount);
+  let wash = (r.washCount !== undefined && r.washCount !== null) ? Number(r.washCount) : NaN;
+  let dry = (r.dryCount !== undefined && r.dryCount !== null) ? Number(r.dryCount) : NaN;
+  let soap = (r.soapCount !== undefined && r.soapCount !== null) ? Number(r.soapCount) : NaN;
+  let labor = (r.laborCount !== undefined && r.laborCount !== null) ? Number(r.laborCount) : NaN;
+  let softener = (r.softenerCount !== undefined && r.softenerCount !== null) ? Number(r.softenerCount) : NaN;
   let bleach = Number(r.bleachCount) || 0;
   let degreaser = Number(r.degreaserCount) || 0;
 
   const textToScan = `${r.notes || ''} ${r.customerName || ''}`.toLowerCase();
   
-  // Buscar si especifica cestas en el texto ("2 cestas", "3 cestas", "2 cesta", etc.)
+  // Detección de modalidades específicas
+  const isSoloLavado = textToScan.includes('solo lavado') || textToScan.includes('lavado + jabón') || textToScan.includes('sin secado');
+  const isSoloSecado = textToScan.includes('solo secado') || textToScan.includes('sin lavado');
+  const isCombo = (textToScan.includes('combo') || textToScan.includes('vip')) && !isSoloLavado && !isSoloSecado;
+
+  const secMatch = textToScan.match(/(\d+)\s*sec/);
+  const lavMatch = textToScan.match(/(\d+)\s*lav/);
   const basketMatch = textToScan.match(/(\d+)\s*cesta/);
+  
+  let explicitSec = secMatch ? parseInt(secMatch[1], 10) : null;
+  let explicitLav = lavMatch ? parseInt(lavMatch[1], 10) : null;
   let detectedBaskets = basketMatch ? parseInt(basketMatch[1], 10) : 0;
 
+  // Si especifica explícitamente secados en la nota (ej: "3 lav, 2 sec")
+  if (explicitSec !== null) {
+    dry = explicitSec;
+  } else if (isSoloLavado) {
+    dry = 0;
+    softener = 0;
+  } else if (isSoloSecado) {
+    wash = 0;
+    soap = 0;
+    softener = 0;
+  }
+
+  // Si especifica explícitamente lavados en la nota
+  if (explicitLav !== null) {
+    wash = explicitLav;
+  }
+
   // Si no hay mención en texto pero el totalUSD coincide con múltiplos de combos ($7.50 c/u)
-  if (!detectedBaskets && r.totalUSD) {
+  if (!detectedBaskets && r.totalUSD && isCombo) {
     const num = Number(r.totalUSD);
     if (Math.abs(num - 15.00) < 0.35) detectedBaskets = 2;
     else if (Math.abs(num - 22.50) < 0.35) detectedBaskets = 3;
@@ -62,30 +88,22 @@ export function normalizeRecordServices(r) {
     else if (Math.abs(num - 37.50) < 0.35) detectedBaskets = 5;
   }
 
-  // Si se detectaron 2 o más cestas pero en las otras columnas marca 1 (por defecto anterior)
-  if (detectedBaskets > 1) {
+  // Si es COMBO explícito y las columnas quedaron en 1 por la versión anterior
+  if (isCombo && detectedBaskets > 1) {
     if (isNaN(wash) || wash <= 1) wash = detectedBaskets;
-    if (isNaN(dry) || dry <= 1) dry = detectedBaskets;
+    if (explicitSec === null && (isNaN(dry) || dry <= 1)) dry = detectedBaskets;
     if (isNaN(soap) || soap <= 1) soap = detectedBaskets;
     if (isNaN(labor) || labor <= 1) labor = detectedBaskets;
     if (isNaN(softener) || softener <= 1) softener = detectedBaskets;
   }
 
-  // Si washCount > 1 pero las otras columnas de combo quedaron en 1
-  if (wash > 1) {
-    if (isNaN(dry) || dry === 1) dry = wash;
-    if (isNaN(soap) || soap === 1) soap = wash;
-    if (isNaN(labor) || labor === 1) labor = wash;
-    if (isNaN(softener) || softener === 1) softener = wash;
-  }
-
   return {
     ...r,
     washCount: isNaN(wash) ? 1 : wash,
-    dryCount: isNaN(dry) ? (isNaN(wash) ? 1 : wash) : dry,
-    soapCount: isNaN(soap) ? (isNaN(wash) ? 1 : wash) : soap,
-    laborCount: isNaN(labor) ? (isNaN(wash) ? 1 : wash) : labor,
-    softenerCount: isNaN(softener) ? (isNaN(wash) ? 1 : wash) : softener,
+    dryCount: isNaN(dry) ? (isSoloLavado ? 0 : 1) : dry,
+    soapCount: isNaN(soap) ? (wash > 0 ? wash : 0) : soap,
+    laborCount: isNaN(labor) ? 1 : labor,
+    softenerCount: isNaN(softener) ? (dry > 0 ? (wash > 0 ? wash : dry) : 0) : softener,
     bleachCount: bleach,
     degreaserCount: degreaser
   };
