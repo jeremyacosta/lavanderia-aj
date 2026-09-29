@@ -555,7 +555,23 @@ export function AppProvider({ children }) {
     ];
   });
 
+  // Contraseñas de Seguridad y Acceso (Personalizables y sincronizables)
+  const [adminPassword, setAdminPassword] = useState(() => {
+    return localStorage.getItem('aj_security_admin_pass') || 'AJ_Admin*2026';
+  });
+
+  const [employeePassword, setEmployeePassword] = useState(() => {
+    return localStorage.getItem('aj_security_employee_pass') || 'LAV_Staff*2026';
+  });
+
   // Persistir en LocalStorage
+  useEffect(() => {
+    localStorage.setItem('aj_security_admin_pass', adminPassword);
+  }, [adminPassword]);
+
+  useEffect(() => {
+    localStorage.setItem('aj_security_employee_pass', employeePassword);
+  }, [employeePassword]);
   useEffect(() => {
     localStorage.setItem('aj_expenses', JSON.stringify(expenses));
   }, [expenses]);
@@ -674,6 +690,23 @@ export function AppProvider({ children }) {
         }
       });
 
+      // 7. Sincronización de Contraseñas del Sistema
+      const unsubSecurity = subscribeToCollection('system_security', (securityDocs) => {
+        if (Array.isArray(securityDocs) && securityDocs.length > 0) {
+          const creds = securityDocs.find(d => d.id === 'credentials');
+          if (creds) {
+            if (creds.adminPassword) {
+              setAdminPassword(creds.adminPassword);
+              localStorage.setItem('aj_security_admin_pass', creds.adminPassword);
+            }
+            if (creds.employeePassword) {
+              setEmployeePassword(creds.employeePassword);
+              localStorage.setItem('aj_security_employee_pass', creds.employeePassword);
+            }
+          }
+        }
+      });
+
       return () => {
         unsubDaily();
         unsubOrders();
@@ -681,6 +714,7 @@ export function AppProvider({ children }) {
         unsubDetergents();
         unsubExpenses();
         unsubCustomers();
+        unsubSecurity();
       };
     }
   }, [isCloudConnected]);
@@ -1010,7 +1044,81 @@ export function AppProvider({ children }) {
 
   // Verificación de Contraseña Administrativa
   const verifyAdminPassword = (password) => {
-    return password === 'aj2026' || password === '1234';
+    if (!password) return false;
+    const clean = String(password).trim();
+    const current = (adminPassword || '').trim();
+    // Si aún tiene la clave por defecto inicial, permitir transición
+    if (current === 'AJ_Admin*2026' && (clean === 'aj2026' || clean === '1234')) {
+      return true;
+    }
+    return clean === current;
+  };
+
+  // Verificación de Contraseña de Personal de Mostrador
+  const verifyEmployeePassword = (password) => {
+    if (!password) return false;
+    const clean = String(password).trim();
+    // El administrador también puede acceder con su clave
+    if (verifyAdminPassword(clean)) return true;
+    const currentEmp = (employeePassword || '').trim();
+    if (currentEmp === 'LAV_Staff*2026' && clean === 'lav2026') {
+      return true;
+    }
+    return clean === currentEmp;
+  };
+
+  // Cambio y Gestión Segura de Contraseñas desde Administración
+  const changePasswords = async ({ currentAdminPassword, newAdminPassword, newEmployeePassword }) => {
+    if (!verifyAdminPassword(currentAdminPassword)) {
+      return { 
+        success: false, 
+        message: 'La contraseña de administrador actual es incorrecta. Operación no autorizada.' 
+      };
+    }
+
+    if (newAdminPassword && newAdminPassword.trim().length < 4) {
+      return { 
+        success: false, 
+        message: 'La nueva contraseña de administrador debe tener al menos 4 caracteres.' 
+      };
+    }
+
+    if (newEmployeePassword && newEmployeePassword.trim().length < 4) {
+      return { 
+        success: false, 
+        message: 'La nueva contraseña de personal debe tener al menos 4 caracteres.' 
+      };
+    }
+
+    const updatedAdmin = newAdminPassword ? newAdminPassword.trim() : adminPassword;
+    const updatedEmployee = newEmployeePassword ? newEmployeePassword.trim() : employeePassword;
+
+    setAdminPassword(updatedAdmin);
+    setEmployeePassword(updatedEmployee);
+    localStorage.setItem('aj_security_admin_pass', updatedAdmin);
+    localStorage.setItem('aj_security_employee_pass', updatedEmployee);
+
+    if (isCloudConnected) {
+      await syncDocToCloud('system_security', 'credentials', {
+        adminPassword: updatedAdmin,
+        employeePassword: updatedEmployee,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    logAuditAction({
+      action: 'ACTUALIZACION_SEGURIDAD',
+      entityType: 'SEGURIDAD',
+      entityId: 'PASSWORDS',
+      reason: 'Cambio de contraseñas de acceso al sistema realizado por el administrador',
+      performedBy: 'Administrador (Jeremy / Saul)',
+      details: `Clave Admin: ${newAdminPassword ? 'Modificada' : 'Sin cambios'} | Clave Personal: ${newEmployeePassword ? 'Modificada' : 'Sin cambios'}.`
+    });
+
+    return { 
+      success: true, 
+      message: '¡Contraseñas actualizadas con éxito! Las nuevas credenciales ya están activas en todos los dispositivos.' 
+    };
   };
 
   // Agregar log a la auditoría
@@ -1115,7 +1223,7 @@ export function AppProvider({ children }) {
     if (!verifyAdminPassword(adminPassword)) {
       return { 
         success: false, 
-        message: 'Contraseña de administrador incorrecta. Ingrese aj2026 o 1234.' 
+        message: 'Contraseña de administrador incorrecta. Verifique sus credenciales e intente de nuevo.' 
       };
     }
 
@@ -1231,7 +1339,11 @@ export function AppProvider({ children }) {
       updateDailyRecord,
       markRecordDelivered,
       markRecordPaid,
+      adminPassword,
+      employeePassword,
       verifyAdminPassword,
+      verifyEmployeePassword,
+      changePasswords,
       deleteRecordWithAudit,
       logAuditAction,
       addDetergentLog,

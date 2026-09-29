@@ -3326,7 +3326,7 @@ export default function EmployeeWorkStation() {
                   autoFocus
                   value={adminPasswordInput}
                   onChange={(e) => setAdminPasswordInput(e.target.value)}
-                  placeholder="Ingresa clave maestra (ej: aj2026)"
+                  placeholder="Ingresa la contraseña de administrador"
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono text-center tracking-widest text-slate-900 focus:outline-none focus:border-red-500"
                 />
               </div>
@@ -3989,7 +3989,7 @@ export default function EmployeeWorkStation() {
                     }
                   }
                 }}
-                placeholder="Ingresa clave maestra (ej: aj2026)"
+                placeholder="Ingresa la contraseña de administrador"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-mono text-center tracking-widest text-slate-900 focus:outline-none focus:border-amber-500"
               />
               {postClosureError && (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppProvider } from './context/AppContext';
+import { AppProvider, useApp } from './context/AppContext';
 import HeaderStatus from './components/client/HeaderStatus';
 import BasketCalculator from './components/client/BasketCalculator';
 import ComforterAndBusSection from './components/client/ComforterAndBusSection';
@@ -68,7 +68,8 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-export default function App() {
+function MainAppContent() {
+  const { verifyAdminPassword, verifyEmployeePassword } = useApp();
   const [magicSyncAlert, setMagicSyncAlert] = useState('');
   const [fbErrorBanner, setFbErrorBanner] = useState('');
 
@@ -108,6 +109,7 @@ export default function App() {
   const [adminAuth, setAdminAuth] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [adminAuthError, setAdminAuthError] = useState('');
 
   // Autenticación específica para Personal LAV
   const [employeeAuth, setEmployeeAuth] = useState(false);
@@ -119,6 +121,8 @@ export default function App() {
     if (adminAuth) {
       setCurrentView(viewName);
     } else {
+      setPasswordInput('');
+      setAdminAuthError('');
       setShowAuthModal(true);
     }
   };
@@ -135,36 +139,32 @@ export default function App() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    // Clave de acceso administrativa por defecto para Lavandería AJ
-    if (passwordInput === 'aj2026' || passwordInput === '1234') {
+    if (verifyAdminPassword(passwordInput)) {
       setAdminAuth(true);
       setShowAuthModal(false);
       setCurrentView('admin_accounting');
       setPasswordInput('');
+      setAdminAuthError('');
     } else {
-      alert('Contraseña incorrecta. (Prueba: aj2026 o 1234)');
+      setAdminAuthError('Contraseña incorrecta. Verifique sus credenciales e intente de nuevo.');
     }
   };
 
   const handleEmployeeLogin = (e) => {
     e.preventDefault();
-    const cleanPass = employeePasswordInput.trim();
-    // Clave requerida por el usuario: 'lav2026' (además de llaves maestras de admin)
-    if (cleanPass === 'lav2026' || cleanPass === 'aj2026' || cleanPass === '1234') {
+    if (verifyEmployeePassword(employeePasswordInput)) {
       setEmployeeAuth(true);
       setShowEmployeeAuthModal(false);
       setCurrentView('employee');
       setEmployeePasswordInput('');
       setEmployeeAuthError('');
     } else {
-      setEmployeeAuthError('Contraseña incorrecta. La clave es lav2026');
+      setEmployeeAuthError('Contraseña incorrecta. Verifique sus credenciales e intente de nuevo.');
     }
   };
 
   return (
-    <ErrorBoundary>
-      <AppProvider>
-      <div className="min-h-screen bg-[#EEF5FB] text-slate-900 flex flex-col justify-between selection:bg-blue-500 selection:text-white">
+    <div className="min-h-screen bg-[#EEF5FB] text-slate-900 flex flex-col justify-between selection:bg-blue-500 selection:text-white">
         
         {/* Alerta de Sincronización Mágica o Error de Reglas */}
         {magicSyncAlert && (
@@ -331,15 +331,25 @@ export default function App() {
               </div>
 
               <form onSubmit={handleLogin} className="space-y-4">
-                <input
-                  type="password"
-                  required
-                  autoFocus
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Contraseña (ej. aj2026)"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-center text-slate-900 focus:outline-none focus:border-blue-500 tracking-widest text-lg font-mono"
-                />
+                <div>
+                  <input
+                    type="password"
+                    required
+                    autoFocus
+                    value={passwordInput}
+                    onChange={(e) => {
+                      setPasswordInput(e.target.value);
+                      if (adminAuthError) setAdminAuthError('');
+                    }}
+                    placeholder="Contraseña de administrador"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-center text-slate-900 focus:outline-none focus:border-blue-500 tracking-widest text-lg font-mono"
+                  />
+                  {adminAuthError && (
+                    <p className="text-rose-600 text-xs text-center font-bold mt-2">
+                      {adminAuthError}
+                    </p>
+                  )}
+                </div>
 
                 <div className="flex gap-2">
                   <button
@@ -361,7 +371,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Modal de Acceso para Personal LAV (Clave: lav2026) */}
+        {/* Modal de Acceso para Personal LAV */}
         {showEmployeeAuthModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
             <div className="w-full max-w-sm rounded-3xl bg-white p-6 border border-blue-200 shadow-2xl animate-in fade-in zoom-in duration-150">
@@ -384,7 +394,7 @@ export default function App() {
                       setEmployeePasswordInput(e.target.value);
                       if (employeeAuthError) setEmployeeAuthError('');
                     }}
-                    placeholder="Contraseña (ej. lav2026)"
+                    placeholder="Contraseña de personal"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-center text-slate-900 focus:outline-none focus:border-blue-500 tracking-widest text-lg font-mono"
                   />
                   {employeeAuthError && (
@@ -414,7 +424,15 @@ export default function App() {
           </div>
         )}
       </div>
-    </AppProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppProvider>
+        <MainAppContent />
+      </AppProvider>
     </ErrorBoundary>
   );
 }
