@@ -31,8 +31,12 @@ export default function BasketCalculator() {
   const [directBaskets, setDirectBaskets] = useState(1);
   const [useDirectBaskets, setUseDirectBaskets] = useState(false);
 
-  // Plan base de servicio: 'comboFull' ($7.50) | 'washWithSoap' ($4.50) | 'custom'
+  // Plan base de servicio: 'comboFull' ($7.50) | 'washWithSoap' ($4.50) | 'dryOnly' ($3.00) | 'custom'
   const [basePlan, setBasePlan] = useState('comboFull');
+
+  // Ajuste libre de cestas a lavar y cestas a secar (permite por ejemplo 3 cestas a lavar pero restar secados a 2)
+  const [customWashBaskets, setCustomWashBaskets] = useState(null);
+  const [customDryBaskets, setCustomDryBaskets] = useState(null);
 
   // Adicionales por cesta a elección (Cloro y Desengrasante se eligen de forma individual por cesta)
   const [bleachBaskets, setBleachBaskets] = useState(0);         // Cloro: $0.50 por cesta elegida
@@ -89,32 +93,107 @@ export default function BasketCalculator() {
     ? Math.min(100, Math.round((totalWeightApprox / standardLimitKg) * 100))
     : 0;
 
-  // Precio unitario por cesta según combo y productos adicionales
-  let baseBasketPrice = 0;
-  let basketUnitPrice = 0;
-  let planTitleSummary = '';
+  // Cantidades efectivas de cestas a lavar y cestas a secar
+  const effectiveWashBaskets = customWashBaskets !== null 
+    ? customWashBaskets 
+    : (basePlan === 'dryOnly' ? 0 : effectiveBaskets);
 
+  const effectiveDryBaskets = customDryBaskets !== null 
+    ? customDryBaskets 
+    : (basePlan === 'washWithSoap' ? 0 : effectiveBaskets);
+
+  const handleSelectBasePlan = (plan) => {
+    setBasePlan(plan);
+    if (plan === 'comboFull') {
+      setCustomWashBaskets(effectiveBaskets);
+      setCustomDryBaskets(effectiveBaskets);
+    } else if (plan === 'washWithSoap') {
+      setCustomWashBaskets(effectiveBaskets);
+      setCustomDryBaskets(0);
+    } else if (plan === 'dryOnly') {
+      setCustomWashBaskets(0);
+      setCustomDryBaskets(effectiveBaskets);
+    } else {
+      setCustomWashBaskets(effectiveBaskets);
+      setCustomDryBaskets(effectiveBaskets);
+    }
+  };
+
+  const handleAdjustWashBaskets = (delta) => {
+    const nextVal = Math.max(0, effectiveWashBaskets + delta);
+    setCustomWashBaskets(nextVal);
+  };
+
+  const handleAdjustDryBaskets = (delta) => {
+    const nextVal = Math.max(0, effectiveDryBaskets + delta);
+    setCustomDryBaskets(nextVal);
+  };
+
+  // Precios configurados
   const bleachPrice = prices.bleach ?? 0.50;
   const degreaserPrice = prices.degreaser ?? 0.50;
+  const comboPrice = prices.comboFull || 7.50;
+  const washWithSoapPrice = prices.washWithSoapCombo || 4.50;
+  const dryOnlyPrice = prices.dryOnly || 3.00;
 
-  if (basePlan === 'comboFull') {
-    baseBasketPrice = prices.comboFull || 7.50;
-    basketUnitPrice = baseBasketPrice;
-    let title = `⭐ Combo Estrella VIP ($${baseBasketPrice.toFixed(2)} c/u)`;
+  // Precio unitario por cesta según combo y productos adicionales
+  let baseBasketPrice = comboPrice;
+  let basketUnitPrice = comboPrice;
+  let subtotalBaseClothes = 0;
+  let planTitleSummary = '';
+
+  if (basePlan === 'washWithSoap') {
+    baseBasketPrice = washWithSoapPrice;
+    basketUnitPrice = washWithSoapPrice;
+    subtotalBaseClothes = effectiveWashBaskets * washWithSoapPrice;
+    let title = `💧 Solo Lavado + Jabón ($${washWithSoapPrice.toFixed(2)} c/u) · ${effectiveWashBaskets} Cesta(s)`;
     const extras = [];
     if (bleachBaskets > 0) extras.push(`${bleachBaskets} Cloro (+$${(bleachBaskets * bleachPrice).toFixed(2)})`);
     if (degreaserBaskets > 0) extras.push(`${degreaserBaskets} Desengrasante (+$${(degreaserBaskets * degreaserPrice).toFixed(2)})`);
     if (extras.length > 0) title += ` + ${extras.join(' + ')}`;
     planTitleSummary = title;
-  } else if (basePlan === 'washWithSoap') {
-    baseBasketPrice = prices.washWithSoapCombo || 4.50;
-    basketUnitPrice = baseBasketPrice;
-    let title = `💧 Lavado + Jabón ($${baseBasketPrice.toFixed(2)} c/u)`;
+  } else if (basePlan === 'dryOnly') {
+    baseBasketPrice = dryOnlyPrice;
+    basketUnitPrice = dryOnlyPrice;
+    subtotalBaseClothes = effectiveDryBaskets * dryOnlyPrice;
+    let title = `💨 Solo Secado ($${dryOnlyPrice.toFixed(2)} c/u) · ${effectiveDryBaskets} Cesta(s)`;
     const extras = [];
     if (bleachBaskets > 0) extras.push(`${bleachBaskets} Cloro (+$${(bleachBaskets * bleachPrice).toFixed(2)})`);
     if (degreaserBaskets > 0) extras.push(`${degreaserBaskets} Desengrasante (+$${(degreaserBaskets * degreaserPrice).toFixed(2)})`);
     if (extras.length > 0) title += ` + ${extras.join(' + ')}`;
     planTitleSummary = title;
+  } else if (basePlan === 'comboFull') {
+    baseBasketPrice = comboPrice;
+    basketUnitPrice = comboPrice;
+    if (effectiveWashBaskets === effectiveDryBaskets) {
+      subtotalBaseClothes = effectiveWashBaskets * comboPrice;
+      let title = `⭐ Combo Estrella VIP ($${comboPrice.toFixed(2)} c/u) · ${effectiveWashBaskets} Cesta(s)`;
+      const extras = [];
+      if (bleachBaskets > 0) extras.push(`${bleachBaskets} Cloro (+$${(bleachBaskets * bleachPrice).toFixed(2)})`);
+      if (degreaserBaskets > 0) extras.push(`${degreaserBaskets} Desengrasante (+$${(degreaserBaskets * degreaserPrice).toFixed(2)})`);
+      if (extras.length > 0) title += ` + ${extras.join(' + ')}`;
+      planTitleSummary = title;
+    } else if (effectiveWashBaskets > effectiveDryBaskets) {
+      const combos = effectiveDryBaskets;
+      const washOnly = effectiveWashBaskets - effectiveDryBaskets;
+      subtotalBaseClothes = (combos * comboPrice) + (washOnly * washWithSoapPrice);
+      let title = `🧺 ${effectiveWashBaskets} Cestas: ${combos} Combo(s) VIP ($${comboPrice.toFixed(2)}) + ${washOnly} Solo Lavado ($${washWithSoapPrice.toFixed(2)})`;
+      const extras = [];
+      if (bleachBaskets > 0) extras.push(`${bleachBaskets} Cloro`);
+      if (degreaserBaskets > 0) extras.push(`${degreaserBaskets} Desengrasante`);
+      if (extras.length > 0) title += ` + ${extras.join(' + ')}`;
+      planTitleSummary = title;
+    } else {
+      const combos = effectiveWashBaskets;
+      const dryOnly = effectiveDryBaskets - effectiveWashBaskets;
+      subtotalBaseClothes = (combos * comboPrice) + (dryOnly * dryOnlyPrice);
+      let title = `🧺 ${effectiveDryBaskets} Cestas: ${combos} Combo(s) VIP ($${comboPrice.toFixed(2)}) + ${dryOnly} Solo Secado ($${dryOnlyPrice.toFixed(2)})`;
+      const extras = [];
+      if (bleachBaskets > 0) extras.push(`${bleachBaskets} Cloro`);
+      if (degreaserBaskets > 0) extras.push(`${degreaserBaskets} Desengrasante`);
+      if (extras.length > 0) title += ` + ${extras.join(' + ')}`;
+      planTitleSummary = title;
+    }
   } else {
     // Modo A la Medida
     let customSum = 0;
@@ -126,17 +205,16 @@ export default function BasketCalculator() {
     if (customLabor) { customSum += (prices.labor || 0.20); activeCustom.push('Mano de obra'); }
     
     baseBasketPrice = customSum;
-    basketUnitPrice = baseBasketPrice;
-    let title = `🛠️ A tu Medida: ${activeCustom.length > 0 ? activeCustom.join(', ') : 'Ningún servicio'}`;
+    basketUnitPrice = customSum;
+    const maxB = Math.max(effectiveWashBaskets, effectiveDryBaskets);
+    subtotalBaseClothes = maxB * customSum;
+    let title = `🛠️ A tu Medida: ${activeCustom.length > 0 ? activeCustom.join(', ') : 'Ningún servicio'} (${maxB} cesta/s)`;
     const extras = [];
     if (bleachBaskets > 0) extras.push(`${bleachBaskets} Cloro (+$${(bleachBaskets * bleachPrice).toFixed(2)})`);
     if (degreaserBaskets > 0) extras.push(`${degreaserBaskets} Desengrasante (+$${(degreaserBaskets * degreaserPrice).toFixed(2)})`);
     if (extras.length > 0) title += ` + ${extras.join(' + ')}`;
     planTitleSummary = title;
   }
-
-  // Costo por cestas base de ropa + costo por productos adicionales seleccionados por cesta
-  const subtotalBaseClothes = effectiveBaskets * baseBasketPrice;
   const subtotalBleach = bleachBaskets * bleachPrice;
   const subtotalDegreaser = degreaserBaskets * degreaserPrice;
   const subtotalClothes = subtotalBaseClothes + subtotalBleach + subtotalDegreaser;
@@ -165,6 +243,8 @@ export default function BasketCalculator() {
     setDirectBaskets(1);
     setUseDirectBaskets(false);
     setBasePlan('comboFull');
+    setCustomWashBaskets(null);
+    setCustomDryBaskets(null);
     setBleachBaskets(0);
     setDegreaserBaskets(0);
   };
@@ -190,11 +270,13 @@ export default function BasketCalculator() {
       }
     }
 
-    if (effectiveBaskets > 0) {
+    if (effectiveBaskets > 0 || effectiveWashBaskets > 0 || effectiveDryBaskets > 0) {
       lines.push('');
       lines.push(`⚙️ *Plan para la ropa:* ${planTitleSummary}`);
-      lines.push(`  ↳ Tarifa base: $${baseBasketPrice.toFixed(2)} por cesta`);
-      lines.push(`  ↳ Cestas de ropa: *${effectiveBaskets} cesta(s) × $${baseBasketPrice.toFixed(2)} = $${subtotalBaseClothes.toFixed(2)} USD*`);
+      if (effectiveWashBaskets !== effectiveDryBaskets) {
+        lines.push(`  ↳ Detalle operaciones: *${effectiveWashBaskets} Lavado(s)* y *${effectiveDryBaskets} Secado(s)*`);
+      }
+      lines.push(`  ↳ Subtotal base ropa: *$${subtotalBaseClothes.toFixed(2)} USD*`);
       if (bleachBaskets > 0) {
         lines.push(`  ↳ 🧪 Cloro: *${bleachBaskets} cesta(s) × $${bleachPrice.toFixed(2)} = +$${subtotalBleach.toFixed(2)} USD*`);
       }
@@ -231,12 +313,11 @@ export default function BasketCalculator() {
     }
 
     const totalComforters = totalComfortersCount || 0;
-    const effectiveTotalBaskets = Math.max(1, effectiveBaskets + totalComforters);
-    const calculatedWashCount = effectiveTotalBaskets;
-    const calculatedDryCount = (basePlan === 'washWithSoap' && basePlan !== 'custom') ? totalComforters : effectiveTotalBaskets;
-    const calculatedSoapCount = effectiveTotalBaskets;
-    const calculatedLaborCount = effectiveTotalBaskets;
-    const calculatedSoftenerCount = (basePlan === 'comboFull' && basePlan !== 'custom') ? effectiveTotalBaskets : totalComforters;
+    const calculatedWashCount = effectiveWashBaskets + totalComforters;
+    const calculatedDryCount = effectiveDryBaskets + totalComforters;
+    const calculatedSoapCount = effectiveWashBaskets + totalComforters;
+    const calculatedLaborCount = Math.max(effectiveWashBaskets, effectiveDryBaskets) + totalComforters;
+    const calculatedSoftenerCount = effectiveDryBaskets + totalComforters;
 
     const createdRecord = addDailyRecord({
       customerName: clientName.trim(),
@@ -259,7 +340,7 @@ export default function BasketCalculator() {
       deliveryStatus: 'in_store',
       origin: 'app',
       intakeStatus: 'pending_intake',
-      notes: `📲 Pedido desde la App: ${useDirectBaskets ? `${directBaskets} cestas directas` : `${totalClothesCount} prendas (~${effectiveBaskets} cestas, ${totalWeightApprox.toFixed(1)} kg${isOverweight ? ` - Sobrepeso +${overweightKg.toFixed(1)} kg` : ''})`}${totalComfortersCount > 0 ? ` + ${totalComfortersCount} edredón(es)` : ''}${bleachBaskets > 0 ? ` + ${bleachBaskets} Cloro ($${(bleachBaskets * bleachPrice).toFixed(2)})` : ''}${degreaserBaskets > 0 ? ` + ${degreaserBaskets} Desengrasante ($${(degreaserBaskets * degreaserPrice).toFixed(2)})` : ''} · ${planTitleSummary}`
+      notes: `📲 Pedido desde la App: ${useDirectBaskets ? `${directBaskets} cestas directas` : `${totalClothesCount} prendas (~${effectiveBaskets} cestas, ${totalWeightApprox.toFixed(1)} kg${isOverweight ? ` - Sobrepeso +${overweightKg.toFixed(1)} kg` : ''})`}${totalComfortersCount > 0 ? ` + ${totalComfortersCount} edredón(es)` : ''} · (${calculatedWashCount} lav, ${calculatedDryCount} sec)${bleachBaskets > 0 ? ` + ${bleachBaskets} Cloro ($${(bleachBaskets * bleachPrice).toFixed(2)})` : ''}${degreaserBaskets > 0 ? ` + ${degreaserBaskets} Desengrasante ($${(degreaserBaskets * degreaserPrice).toFixed(2)})` : ''} · ${planTitleSummary}`
     });
 
     setSentOrderDetails({
@@ -267,7 +348,7 @@ export default function BasketCalculator() {
       name: clientName.trim(),
       totalUSD,
       totalBs,
-      baskets: effectiveBaskets
+      baskets: Math.max(effectiveWashBaskets, effectiveDryBaskets) || effectiveBaskets
     });
     setOrderSentSuccess(true);
     setShowOrderModal(false);
@@ -713,12 +794,12 @@ export default function BasketCalculator() {
           </span>
         </div>
 
-        {/* 3 Planes Base */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+        {/* 4 Planes Base */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
           
           {/* Combo Estrella */}
           <div 
-            onClick={() => setBasePlan('comboFull')} 
+            onClick={() => handleSelectBasePlan('comboFull')} 
             className={`cursor-pointer rounded-2xl p-4 border-2 transition-all relative ${
               basePlan === 'comboFull' 
                 ? 'bg-blue-50/80 border-blue-600 shadow-md ring-2 ring-blue-500/20' 
@@ -745,7 +826,7 @@ export default function BasketCalculator() {
 
           {/* Lavado + Jabón */}
           <div 
-            onClick={() => setBasePlan('washWithSoap')} 
+            onClick={() => handleSelectBasePlan('washWithSoap')} 
             className={`cursor-pointer rounded-2xl p-4 border-2 transition-all relative ${
               basePlan === 'washWithSoap' 
                 ? 'bg-blue-50/80 border-blue-600 shadow-md ring-2 ring-blue-500/20' 
@@ -770,9 +851,36 @@ export default function BasketCalculator() {
             </div>
           </div>
 
+          {/* Solo Secado */}
+          <div 
+            onClick={() => handleSelectBasePlan('dryOnly')} 
+            className={`cursor-pointer rounded-2xl p-4 border-2 transition-all relative ${
+              basePlan === 'dryOnly' 
+                ? 'bg-blue-50/80 border-blue-600 shadow-md ring-2 ring-blue-500/20' 
+                : 'bg-white border-slate-200 hover:border-blue-300'
+            }`}
+          >
+            {basePlan === 'dryOnly' && (
+              <span className="absolute top-3 right-3 text-blue-600">
+                <CheckCircle2 size={18} />
+              </span>
+            )}
+            <span className="text-[10px] font-black uppercase text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+              Ropa Lavada
+            </span>
+            <h4 className="font-black text-slate-900 text-sm mt-1.5">SOLO SECADO</h4>
+            <p className="text-[11px] text-slate-600 mt-1 mb-2 leading-tight">
+              Secado profundo en máquina industrial + Mano de Obra
+            </p>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-blue-700">$3.00</span>
+              <span className="text-xs font-semibold text-slate-500">/ cesta</span>
+            </div>
+          </div>
+
           {/* A Medida */}
           <div 
-            onClick={() => setBasePlan('custom')} 
+            onClick={() => handleSelectBasePlan('custom')} 
             className={`cursor-pointer rounded-2xl p-4 border-2 transition-all relative ${
               basePlan === 'custom' 
                 ? 'bg-blue-50/80 border-blue-600 shadow-md ring-2 ring-blue-500/20' 
@@ -796,6 +904,121 @@ export default function BasketCalculator() {
               <span className="text-xs font-semibold text-slate-500">/ cesta</span>
             </div>
           </div>
+        </div>
+
+        {/* Ajuste Flexible de Operaciones (Permite restar secados si alguna cesta no se va a secar) */}
+        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+            <div>
+              <div className="flex items-center gap-1.5 font-black text-xs sm:text-sm text-slate-900">
+                <span>🎛️ Ajuste Libre de Cestas a Lavar y Secar</span>
+                {effectiveWashBaskets !== effectiveDryBaskets && (
+                  <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300">
+                    Ajuste personalizado activo
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500">
+                ¿Llevas varias cestas pero alguna no la vas a secar, o traes ropa limpia para secar? Suma o resta aquí libremente:
+              </p>
+            </div>
+            {(effectiveWashBaskets !== effectiveBaskets || (basePlan === 'comboFull' && effectiveDryBaskets !== effectiveBaskets)) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomWashBaskets(effectiveBaskets);
+                  setCustomDryBaskets(basePlan === 'washWithSoap' ? 0 : basePlan === 'dryOnly' ? effectiveBaskets : effectiveBaskets);
+                }}
+                className="text-[11px] font-bold text-blue-600 hover:underline self-start sm:self-auto"
+              >
+                Restablecer cantidades
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Stepper Lavado */}
+            <div className={`p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+              effectiveWashBaskets > 0 ? 'bg-white border-blue-300 shadow-2xs' : 'bg-slate-100 border-slate-200 opacity-60'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🫧</span>
+                <div>
+                  <span className="text-xs font-black text-slate-900 block">Cestas a Lavar:</span>
+                  <span className="text-[10px] text-slate-500 font-semibold">
+                    {effectiveWashBaskets} cesta{effectiveWashBaskets !== 1 ? 's' : ''} con jabón incluido
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleAdjustWashBaskets(-1)}
+                  className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                  title="Restar una cesta de lavado"
+                >
+                  -
+                </button>
+                <span className="font-mono font-black text-sm w-6 text-center select-none text-blue-700">
+                  {effectiveWashBaskets}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleAdjustWashBaskets(+1)}
+                  className="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                  title="Sumar una cesta de lavado"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* Stepper Secado (Permite restar secados) */}
+            <div className={`p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+              effectiveDryBaskets > 0 ? 'bg-white border-blue-300 shadow-2xs' : 'bg-amber-50 border-amber-300'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">💨</span>
+                <div>
+                  <span className="text-xs font-black text-slate-900 block">Cestas a Secar:</span>
+                  <span className="text-[10px] text-slate-500 font-semibold">
+                    {effectiveDryBaskets === 0 ? 'Ninguna cesta se secará en el local' : `${effectiveDryBaskets} cesta${effectiveDryBaskets !== 1 ? 's' : ''} listas para doblar`}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleAdjustDryBaskets(-1)}
+                  className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                  title="Restar una cesta de secado (ej: para secar en casa)"
+                >
+                  -
+                </button>
+                <span className={`font-mono font-black text-sm w-6 text-center select-none ${effectiveDryBaskets === 0 ? 'text-amber-700' : 'text-blue-700'}`}>
+                  {effectiveDryBaskets}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleAdjustDryBaskets(+1)}
+                  className="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-sm flex items-center justify-center transition-colors active:scale-95"
+                  title="Sumar una cesta de secado"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Explicación de ahorro cuando se restan secados */}
+          {effectiveWashBaskets > effectiveDryBaskets && (
+            <div className="mt-2.5 p-2 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center gap-2">
+              <span className="text-base shrink-0">💡</span>
+              <span>
+                Has restado el secado a <strong>{effectiveWashBaskets - effectiveDryBaskets} cesta(s)</strong>. El sistema te cobra solo el lavado ($4.50 c/u) para esas cestas, ahorrándote <strong>${((effectiveWashBaskets - effectiveDryBaskets) * 3.00).toFixed(2)} USD</strong>.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* SECCIÓN DE PRODUCTOS ESPECIALES ADICIONALES (CLORO Y DESENGRASANTE) POR CESTA */}

@@ -5,7 +5,8 @@ import {
   Clock, AlertCircle, Trash2, Check, DollarSign, 
   Sparkles, X, ShieldAlert, FileText, Share2, 
   Package, Droplets, CheckSquare, Layers, Lock, 
-  Calendar, Eye, Phone, RefreshCw, Smartphone, ArrowRight, MessageCircle
+  Calendar, Eye, Phone, RefreshCw, Smartphone, ArrowRight, MessageCircle,
+  Printer, Copy
 } from 'lucide-react';
 
 export default function EmployeeWorkStation() {
@@ -77,6 +78,11 @@ export default function EmployeeWorkStation() {
   const [editBleachCount, setEditBleachCount] = useState(0);
   const [editDegreaserCount, setEditDegreaserCount] = useState(0);
   const [editTotalUSD, setEditTotalUSD] = useState('');
+
+  // === MODAL DE COMPROBANTE DE PAGO ===
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptRecord, setReceiptRecord] = useState(null);
+  const [receiptCopiedToast, setReceiptCopiedToast] = useState(false);
 
   // === MODAL HACER CIERRE DEL DIA ===
   const [closureModalOpen, setClosureModalOpen] = useState(false);
@@ -249,6 +255,88 @@ export default function EmployeeWorkStation() {
       `¡Te esperamos!`
     );
     window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+  };
+
+  // Abrir Modal de Comprobante de Pago
+  const openReceiptModal = (rec) => {
+    setReceiptRecord(rec);
+    setReceiptModalOpen(true);
+  };
+
+  // Enviar Comprobante Digital Oficial por WhatsApp
+  const shareReceiptWhatsApp = (rec) => {
+    const rawPhone = (rec.customerPhone || '').replace(/\D/g, '');
+    let cleanPhone = rawPhone;
+    if (cleanPhone.startsWith('0')) cleanPhone = '58' + cleanPhone.slice(1);
+    else if (!cleanPhone.startsWith('58') && cleanPhone.length > 0) cleanPhone = '58' + cleanPhone;
+
+    const ticketId = rec.id ? rec.id.slice(-6).toUpperCase() : '000';
+    const isPaid = rec.paymentStatus === 'paid';
+    const safeRate = exchangeRate || 40.50;
+    const paidUSD = rec.amountPaidUSD !== undefined ? rec.amountPaidUSD : (isPaid ? rec.totalUSD : 0);
+    const paidBs = rec.amountPaidBs !== undefined ? rec.amountPaidBs : (paidUSD * safeRate);
+    const debt = rec.debtUSD !== undefined ? rec.debtUSD : (isPaid ? 0 : rec.totalUSD);
+
+    const text = encodeURIComponent(
+      `🧾 *COMPROBANTE DE PAGO · LAVANDERÍA AJ EXPRESS*\n` +
+      `_"El mejor servicio al mejor precio es nuestra mayor prioridad"_\n\n` +
+      `📌 *N° de Ticket:* #TKT-${ticketId}\n` +
+      `👤 *Cliente:* ${rec.customerName}\n` +
+      `📅 *Fecha:* ${rec.date} · 🕒 ${rec.time}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🧺 *Servicio:* ${rec.notes || `${rec.washCount || 1} Cesta(s)`}\n` +
+      `🫧 Lavados: ${rec.washCount || 0}   |   💨 Secados: ${rec.dryCount || 0}\n` +
+      `🧼 Jabón: ${rec.soapCount || 0}   |   🌸 Suavizante: ${rec.softenerCount || 0}\n` +
+      (rec.bleachCount > 0 ? `🧪 Cloro: ${rec.bleachCount} cesta(s)\n` : '') +
+      (rec.degreaserCount > 0 ? `🧽 Desengrasante: ${rec.degreaserCount} cesta(s)\n` : '') +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `💵 *Total:* $${(rec.totalUSD || 0).toFixed(2)} USD (Bs. ${(rec.totalBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })})\n` +
+      `💰 *Monto Pagado:* $${paidUSD.toFixed(2)} USD (Bs. ${paidBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })})\n` +
+      (debt > 0 
+        ? `⏳ *Saldo Pendiente:* $${debt.toFixed(2)} USD\n` 
+        : `✅ *Estado:* TOTALMENTE PAGADO\n`) +
+      `💳 *Forma de Pago:* ${rec.paymentMethod === 'usd_cash' ? 'Efectivo USD ($)' : rec.paymentMethod === 'pago_movil' ? 'Pago Móvil' : rec.paymentMethod === 'bs_cash' ? 'Efectivo Bs' : 'Transferencia'}\n` +
+      (rec.bankReference ? `🔖 *Referencia:* ${rec.bankReference}\n` : '') +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 *Entrega:* ${rec.deliveryStatus === 'delivered' ? '✅ Ropa ya entregada' : '🧺 En local / Lista para retirar'}\n\n` +
+      `¡Muchas gracias por su preferencia! Conserve este comprobante para retirar.`
+    );
+
+    if (cleanPhone && cleanPhone.length >= 10) {
+      window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+    } else {
+      const userPhone = prompt('Ingresa el número de WhatsApp del cliente para enviarle el comprobante (Ej: 04121234567):');
+      if (userPhone) {
+        let p = userPhone.replace(/\D/g, '');
+        if (p.startsWith('0')) p = '58' + p.slice(1);
+        else if (!p.startsWith('58')) p = '58' + p;
+        window.open(`https://wa.me/${p}?text=${text}`, '_blank');
+      }
+    }
+  };
+
+  // Copiar Comprobante de Pago al Portapapeles
+  const copyReceiptText = (rec) => {
+    const ticketId = rec.id ? rec.id.slice(-6).toUpperCase() : '000';
+    const isPaid = rec.paymentStatus === 'paid';
+    const paidUSD = rec.amountPaidUSD !== undefined ? rec.amountPaidUSD : (isPaid ? rec.totalUSD : 0);
+    const debt = rec.debtUSD !== undefined ? rec.debtUSD : (isPaid ? 0 : rec.totalUSD);
+
+    const text = 
+      `🧾 COMPROBANTE DE PAGO · LAVANDERÍA AJ EXPRESS\n` +
+      `"El mejor servicio al mejor precio es nuestra mayor prioridad"\n\n` +
+      `N° Ticket: #TKT-${ticketId}\n` +
+      `Cliente: ${rec.customerName}\n` +
+      `Fecha: ${rec.date} · ${rec.time}\n` +
+      `Servicio: ${rec.notes || `${rec.washCount || 1} Cesta(s)`}\n` +
+      `Total: $${(rec.totalUSD || 0).toFixed(2)} USD (Bs. ${(rec.totalBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })})\n` +
+      `Pagado: $${paidUSD.toFixed(2)} USD\n` +
+      `Estado: ${debt === 0 ? 'PAGADO COMPLETO' : `PENDIENTE ($${debt.toFixed(2)} USD)`}\n` +
+      `Ref: ${rec.bankReference || 'Sin referencia'}\n`;
+
+    navigator.clipboard.writeText(text);
+    setReceiptCopiedToast(true);
+    setTimeout(() => setReceiptCopiedToast(false), 3000);
   };
 
   // Cálculo de precio flexible y justo considerando operaciones exactas
@@ -1852,13 +1940,24 @@ export default function EmployeeWorkStation() {
                         <button
                           type="button"
                           onClick={() => notifyCustomerWhatsApp(rec)}
-                          className="px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1 active:scale-95 transition-all"
+                          className="px-3 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1 active:scale-95 transition-all"
                           title="Avisar por WhatsApp que la ropa está lista"
                         >
                           <MessageCircle size={15} className="text-emerald-600" />
                           <span>Avisar</span>
                         </button>
                       )}
+
+                      {/* Botón Comprobante de Pago Oficial */}
+                      <button
+                        type="button"
+                        onClick={() => openReceiptModal(rec)}
+                        className="px-3 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all"
+                        title="Generar comprobante de pago oficial para el cliente"
+                      >
+                        <FileText size={15} className="text-blue-600" />
+                        <span>Recibo</span>
+                      </button>
                     </div>
                   </div>
                 ))
@@ -1933,6 +2032,14 @@ export default function EmployeeWorkStation() {
                                 title="Avisar por WhatsApp"
                               >
                                 <MessageCircle size={10} /> Avisar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openReceiptModal(rec)}
+                                className="text-[10px] text-blue-600 font-bold hover:underline flex items-center gap-0.5 ml-1"
+                                title="Ver comprobante de pago para este cliente"
+                              >
+                                <FileText size={10} /> Recibo
                               </button>
                             </div>
                           )}
@@ -2054,21 +2161,32 @@ export default function EmployeeWorkStation() {
                           )}
                         </td>
 
-                        {/* Botón de Borrado Protegido */}
+                        {/* Botón de Recibo y Borrado Protegido */}
                         <td className="py-3 px-3 text-center whitespace-nowrap">
-                          <button
-                            title="Eliminar registro (Requiere Clave de Administrador)"
-                            onClick={() => {
-                              setRecordToDelete(rec);
-                              setAdminPasswordInput('');
-                              setDeleteReasonInput('');
-                              setDeleteErrorMsg('');
-                              setDeleteModalOpen(true);
-                            }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openReceiptModal(rec)}
+                              className="p-1.5 rounded-lg text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors flex items-center gap-1 text-[11px] font-black"
+                              title="Generar e imprimir comprobante de pago oficial"
+                            >
+                              <FileText size={13} />
+                              <span>Recibo</span>
+                            </button>
+                            <button
+                              title="Eliminar registro (Requiere Clave de Administrador)"
+                              onClick={() => {
+                                setRecordToDelete(rec);
+                                setAdminPasswordInput('');
+                                setDeleteReasonInput('');
+                                setDeleteErrorMsg('');
+                                setDeleteModalOpen(true);
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -3409,6 +3527,224 @@ export default function EmployeeWorkStation() {
                 >Desbloquear</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════
+          MODAL: COMPROBANTE DE PAGO OFICIAL PARA CLIENTES
+      ══════════════════════════════════════════════════ */}
+      {receiptModalOpen && receiptRecord && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm overflow-y-auto">
+          {/* Estilos para impresión limpia de la tirilla/recibo */}
+          <style dangerouslySetInnerHTML={{ __html: `
+            @media print {
+              body * { visibility: hidden !important; }
+              #printable-receipt-area, #printable-receipt-area * { visibility: visible !important; }
+              #printable-receipt-area {
+                position: fixed !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                max-width: 420px !important;
+                margin: 0 auto !important;
+                padding: 16px !important;
+                box-shadow: none !important;
+                border: 1px solid #ddd !important;
+              }
+            }
+          `}} />
+
+          <div className="relative w-full max-w-md bg-white rounded-3xl border border-blue-200 shadow-2xl overflow-hidden my-4 flex flex-col max-h-[92vh]">
+            
+            {/* Cabecera del Modal (No imprimible) */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-slate-50 print:hidden shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center shadow-xs">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base leading-tight">Comprobante de Pago</h3>
+                  <p className="text-[11px] text-slate-500">Ticket oficial de servicio para el cliente</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReceiptModalOpen(false)}
+                className="w-9 h-9 rounded-xl bg-white hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors border border-slate-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* CUERPO DEL COMPROBANTE */}
+            <div className="overflow-y-auto p-5 sm:p-6 space-y-4 text-slate-800 bg-white flex-1" id="printable-receipt-area">
+              
+              {/* Encabezado del Negocio */}
+              <div className="text-center pb-3 border-b-2 border-dashed border-slate-300">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-600 text-white font-black text-xl mb-1 shadow-sm">
+                  AJ
+                </div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">LAVANDERÍA AJ EXPRESS</h2>
+                <p className="text-[11px] font-bold text-blue-700 tracking-wide">SERVICIO DE LAVANDERÍA Y TINTORERÍA</p>
+                <p className="text-[10px] text-slate-500 italic mt-0.5">"El mejor servicio al mejor precio es nuestra mayor prioridad"</p>
+                
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 text-xs font-bold text-slate-600">
+                  <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                    #TKT-{(receiptRecord.id || '').slice(-6).toUpperCase()}
+                  </span>
+                  <span className="text-[11px]">{receiptRecord.date} · {receiptRecord.time}</span>
+                </div>
+              </div>
+
+              {/* Datos del Cliente */}
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-bold uppercase text-[10px]">Cliente:</span>
+                  <strong className="text-slate-900 font-black text-sm">{receiptRecord.customerName}</strong>
+                </div>
+                {receiptRecord.customerPhone && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-bold uppercase text-[10px]">Teléfono:</span>
+                    <span className="font-mono font-bold text-slate-700">{receiptRecord.customerPhone}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-bold uppercase text-[10px]">Origen:</span>
+                  <span className="font-bold text-blue-800">{receiptRecord.origin === 'app' ? '📱 Pedido por App' : '🏪 Mostrador Local'}</span>
+                </div>
+              </div>
+
+              {/* Desglose de Servicios y Operaciones */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-black text-slate-700 pb-1 border-b border-slate-200">
+                  <span>DESCRIPCIÓN DEL SERVICIO</span>
+                  <span>DETALLE</span>
+                </div>
+
+                <div className="text-xs space-y-1.5">
+                  <div className="flex items-center justify-between font-bold text-slate-800">
+                    <span>🧺 Total Cestas:</span>
+                    <span className="font-mono text-sm font-black text-blue-900">{receiptRecord.washCount || 1} Cesta(s)</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5 py-2 px-2.5 rounded-xl bg-blue-50/60 border border-blue-100 text-[11px] font-bold text-slate-700">
+                    <div>🫧 Lavados: <span className="font-black text-blue-700">{receiptRecord.washCount || 0}</span></div>
+                    <div>💨 Secados: <span className="font-black text-blue-700">{receiptRecord.dryCount || 0}</span></div>
+                    <div>🧼 Jabón: <span className="font-black text-blue-700">{receiptRecord.soapCount || 0}</span></div>
+                    <div>🌸 Suavizante: <span className="font-black text-purple-700">{receiptRecord.softenerCount || 0}</span></div>
+                    {receiptRecord.bleachCount > 0 && (
+                      <div className="col-span-2 text-cyan-800 font-black">🧪 Cloro: {receiptRecord.bleachCount} cesta(s) (+$0.50 c/u)</div>
+                    )}
+                    {receiptRecord.degreaserCount > 0 && (
+                      <div className="col-span-2 text-amber-800 font-black">🧽 Desengrasante: {receiptRecord.degreaserCount} cesta(s) (+$0.50 c/u)</div>
+                    )}
+                  </div>
+
+                  {receiptRecord.notes && (
+                    <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100 italic">
+                      📝 {receiptRecord.notes}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Bloque Financiero y Estado de Pago */}
+              <div className="pt-2 border-t-2 border-dashed border-slate-300 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span>Total en Divisas:</span>
+                  <span className="font-mono font-bold text-slate-900 text-sm">${(receiptRecord.totalUSD || 0).toFixed(2)} USD</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
+                  <span>Tasa Oficial BCV:</span>
+                  <span>Bs. {(exchangeRate || 40.50).toFixed(2)} / USD</span>
+                </div>
+                <div className="flex items-center justify-between text-sm font-black text-slate-900 pt-1 border-t border-slate-100">
+                  <span>Total en Bolívares:</span>
+                  <span className="font-mono text-base text-blue-900">
+                    Bs. {(receiptRecord.totalBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                {/* Sello de Pago */}
+                <div className="mt-2 p-3 rounded-2xl border flex items-center justify-between gap-2 bg-slate-50">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Estado del Pago</span>
+                    <strong className={`text-xs sm:text-sm font-black uppercase ${
+                      receiptRecord.paymentStatus === 'paid' 
+                        ? 'text-emerald-700' 
+                        : receiptRecord.paymentStatus === 'partial' 
+                          ? 'text-amber-700' 
+                          : 'text-red-700'
+                    }`}>
+                      {receiptRecord.paymentStatus === 'paid' ? '✅ PAGADO COMPLETO' : receiptRecord.paymentStatus === 'partial' ? '⚠️ ABONO PARCIAL' : '⏳ PENDIENTE AL RETIRAR'}
+                    </strong>
+                    {receiptRecord.bankReference && (
+                      <span className="text-[10px] text-slate-500 block font-mono">Ref: {receiptRecord.bankReference}</span>
+                    )}
+                  </div>
+                  <div className="text-right font-mono">
+                    <span className="text-[10px] text-slate-500 block font-bold">Monto Pagado</span>
+                    <span className="font-black text-slate-900 text-sm">
+                      ${(receiptRecord.amountPaidUSD !== undefined ? receiptRecord.amountPaidUSD : (receiptRecord.paymentStatus === 'paid' ? receiptRecord.totalUSD : 0)).toFixed(2)} USD
+                    </span>
+                    {receiptRecord.debtUSD > 0 && (
+                      <span className="text-[10px] text-red-600 block font-bold">
+                        Resta: ${receiptRecord.debtUSD.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Pie de Recibo */}
+              <div className="text-center pt-2 text-[10px] text-slate-500 space-y-1 border-t border-slate-100">
+                <p className="font-bold text-slate-700">Estado de Ropa: {receiptRecord.deliveryStatus === 'delivered' ? '✅ Ya entregada' : '🧺 Lista para retirar en local'}</p>
+                <p>Presenta este comprobante digital al momento de retirar tus prendas.</p>
+                <p className="font-black text-blue-800">¡Gracias por preferirnos!</p>
+              </div>
+            </div>
+
+            {/* Botones de Acción (No imprimibles) */}
+            <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-100 space-y-2 print:hidden shrink-0">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => shareReceiptWhatsApp(receiptRecord)}
+                  className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                >
+                  <MessageCircle size={16} />
+                  <span>Enviar WhatsApp</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                >
+                  <Printer size={16} />
+                  <span>Imprimir / PDF</span>
+                </button>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => copyReceiptText(receiptRecord)}
+                  className="flex-1 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Copy size={14} />
+                  <span>{receiptCopiedToast ? '¡Copiado con Éxito!' : 'Copiar Texto'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReceiptModalOpen(false)}
+                  className="py-2 px-4 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
