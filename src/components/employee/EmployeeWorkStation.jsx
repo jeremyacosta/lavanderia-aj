@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { 
   BookOpen, Plus, Search, Filter, CheckCircle2, 
@@ -6,12 +6,13 @@ import {
   Sparkles, X, ShieldAlert, FileText, Share2, 
   Package, Droplets, CheckSquare, Layers, Lock, 
   Calendar, Eye, Phone, RefreshCw, Smartphone, ArrowRight, MessageCircle,
-  Printer, Copy
+  Printer, Copy, UserCheck
 } from 'lucide-react';
 
 export default function EmployeeWorkStation() {
   const { 
     dailyRecords, 
+    customers,
     addDailyRecord, 
     updateDailyRecord,
     markRecordDelivered, 
@@ -47,10 +48,16 @@ export default function EmployeeWorkStation() {
   const [intakePaymentMethod, setIntakePaymentMethod] = useState('pago_movil');
   const [intakeBankRef, setIntakeBankRef] = useState('');
   const [intakeNotes, setIntakeNotes] = useState('');
+  const [intakeCedula, setIntakeCedula] = useState('');
 
   // Estado para la Barra Directa de Carga en Mostrador
+  const [inlineClientCedula, setInlineClientCedula] = useState('');
   const [inlineClientName, setInlineClientName] = useState('');
   const [inlineClientPhone, setInlineClientPhone] = useState('');
+  const [inlineMatchedCustomer, setInlineMatchedCustomer] = useState(null);
+  const [inlineShowCedulaSuggestions, setInlineShowCedulaSuggestions] = useState(false);
+  const [inlineShowNameSuggestions, setInlineShowNameSuggestions] = useState(false);
+
   const [inlineBaskets, setInlineBaskets] = useState(1);
   const [inlineWashCount, setInlineWashCount] = useState(1);
   const [inlineDryCount, setInlineDryCount] = useState(1);
@@ -95,8 +102,12 @@ export default function EmployeeWorkStation() {
   // Estado del Formulario de Carga Rápida (Mostrador)
   const [showAddModal, setShowAddModal] = useState(false);
   const [time, setTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  const [customerCedula, setCustomerCedula] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [modalMatchedCustomer, setModalMatchedCustomer] = useState(null);
+  const [modalShowCedulaSuggestions, setModalShowCedulaSuggestions] = useState(false);
+  const [modalShowNameSuggestions, setModalShowNameSuggestions] = useState(false);
   
   // Servicios (cantidades)
   const [washCount, setWashCount] = useState(1);
@@ -106,6 +117,205 @@ export default function EmployeeWorkStation() {
   const [softenerCount, setSoftenerCount] = useState(1);
   const [bleachCount, setBleachCount] = useState(0);
   const [degreaserCount, setDegreaserCount] = useState(0);
+
+  // Directorio consolidado de clientes para autocompletado y reconocimiento inteligente
+  const registeredClients = useMemo(() => {
+    const map = new Map();
+    // 1. Clientes registrados en AppContext / CRM
+    (customers || []).forEach(c => {
+      const key = (c.cedula ? c.cedula.trim().toLowerCase() : '') || 
+                  (c.phone ? c.phone.trim() : '') || 
+                  (c.name ? c.name.trim().toLowerCase() : '');
+      if (key) {
+        map.set(key, {
+          name: c.name || '',
+          cedula: c.cedula || '',
+          phone: c.phone || '',
+          visits: c.visits || 1,
+          notes: c.notes || ''
+        });
+      }
+    });
+
+    // 2. Historial de tickets del cuaderno
+    (dailyRecords || []).forEach(r => {
+      if (r.customerName && r.customerName !== 'Cliente sin nombre') {
+        const cedKey = r.customerCedula ? r.customerCedula.trim().toLowerCase() : '';
+        const phoneKey = r.customerPhone && r.customerPhone !== 'En mostrador' ? r.customerPhone.trim() : '';
+        const nameKey = r.customerName.trim().toLowerCase();
+
+        let foundKey = null;
+        if (cedKey && map.has(cedKey)) foundKey = cedKey;
+        else if (phoneKey && map.has(phoneKey)) foundKey = phoneKey;
+        else if (nameKey && map.has(nameKey)) foundKey = nameKey;
+
+        if (foundKey) {
+          const item = map.get(foundKey);
+          if (!item.cedula && r.customerCedula) item.cedula = r.customerCedula;
+          if (!item.phone && r.customerPhone && r.customerPhone !== 'En mostrador') item.phone = r.customerPhone;
+          item.visits = Math.max(item.visits || 1, 2);
+        } else {
+          const newKey = cedKey || phoneKey || nameKey;
+          map.set(newKey, {
+            name: r.customerName,
+            cedula: r.customerCedula || '',
+            phone: r.customerPhone && r.customerPhone !== 'En mostrador' ? r.customerPhone : '',
+            visits: 1,
+            notes: ''
+          });
+        }
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => (b.visits || 1) - (a.visits || 1));
+  }, [customers, dailyRecords]);
+
+  // Búsqueda por cédula
+  const getCedulaMatches = (query) => {
+    if (!query || query.trim().length < 2) return [];
+    const cleanQ = query.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return registeredClients.filter(c => {
+      const cleanC = (c.cedula || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return cleanC.includes(cleanQ);
+    }).slice(0, 5);
+  };
+
+  // Búsqueda por nombre
+  const getNameMatches = (query) => {
+    if (!query || query.trim().length < 2) return [];
+    const q = query.toLowerCase().trim();
+    return registeredClients.filter(c => 
+      c.name.toLowerCase().includes(q)
+    ).slice(0, 5);
+  };
+
+  // Seleccionar cliente en Barra Directa
+  const handleSelectCustomerInline = (client) => {
+    setInlineClientCedula(client.cedula || '');
+    setInlineClientName(client.name || '');
+    setInlineClientPhone(client.phone || '');
+    setInlineMatchedCustomer(client);
+    setInlineShowCedulaSuggestions(false);
+    setInlineShowNameSuggestions(false);
+  };
+
+  const handleInlineCedulaChange = (val) => {
+    setInlineClientCedula(val);
+    setInlineShowCedulaSuggestions(true);
+    setInlineShowNameSuggestions(false);
+
+    const cleanInput = val.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanInput.length >= 6) {
+      const match = registeredClients.find(c => {
+        const cleanC = (c.cedula || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return cleanC === cleanInput;
+      });
+      if (match) {
+        setInlineClientName(match.name);
+        if (match.phone) setInlineClientPhone(match.phone);
+        setInlineMatchedCustomer(match);
+        return;
+      }
+    }
+    if (inlineMatchedCustomer && val !== inlineMatchedCustomer.cedula) {
+      setInlineMatchedCustomer(null);
+    }
+  };
+
+  const handleInlineNameChange = (val) => {
+    setInlineClientName(val);
+    setInlineShowNameSuggestions(true);
+    setInlineShowCedulaSuggestions(false);
+
+    const match = val.toLowerCase().match(/(\d+)\s*cesta/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num >= 1 && num <= 10) {
+        handleInlineBasketsChange(num);
+      }
+    }
+
+    const exactMatch = registeredClients.find(c => c.name.toLowerCase().trim() === val.toLowerCase().trim());
+    if (exactMatch) {
+      if (exactMatch.cedula && !inlineClientCedula) setInlineClientCedula(exactMatch.cedula);
+      if (exactMatch.phone && !inlineClientPhone) setInlineClientPhone(exactMatch.phone);
+      setInlineMatchedCustomer(exactMatch);
+    } else if (inlineMatchedCustomer && val !== inlineMatchedCustomer.name) {
+      setInlineMatchedCustomer(null);
+    }
+  };
+
+  // Seleccionar cliente en Modal Detallado
+  const handleSelectCustomerModal = (client) => {
+    setCustomerCedula(client.cedula || '');
+    setCustomerName(client.name || '');
+    setCustomerPhone(client.phone || '');
+    setModalMatchedCustomer(client);
+    setModalShowCedulaSuggestions(false);
+    setModalShowNameSuggestions(false);
+  };
+
+  const handleModalCedulaChange = (val) => {
+    setCustomerCedula(val);
+    setModalShowCedulaSuggestions(true);
+    setModalShowNameSuggestions(false);
+
+    const cleanInput = val.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanInput.length >= 6) {
+      const match = registeredClients.find(c => {
+        const cleanC = (c.cedula || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return cleanC === cleanInput;
+      });
+      if (match) {
+        setCustomerName(match.name);
+        if (match.phone) setCustomerPhone(match.phone);
+        setModalMatchedCustomer(match);
+        return;
+      }
+    }
+    if (modalMatchedCustomer && val !== modalMatchedCustomer.cedula) {
+      setModalMatchedCustomer(null);
+    }
+  };
+
+  const handleModalNameChange = (val) => {
+    setCustomerName(val);
+    setModalShowNameSuggestions(true);
+    setModalShowCedulaSuggestions(false);
+
+    const match = val.toLowerCase().match(/(\d+)\s*cesta/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num >= 1 && num <= 10) {
+        setWashCount(num);
+        setDryCount(num);
+        setSoapCount(num);
+        setLaborCount(num);
+        setSoftenerCount(num);
+        setManualTotalUSD((num * (prices.comboFull || 7.50)).toFixed(2));
+      }
+    }
+
+    const exactMatch = registeredClients.find(c => c.name.toLowerCase().trim() === val.toLowerCase().trim());
+    if (exactMatch) {
+      if (exactMatch.cedula && !customerCedula) setCustomerCedula(exactMatch.cedula);
+      if (exactMatch.phone && !customerPhone) setCustomerPhone(exactMatch.phone);
+      setModalMatchedCustomer(exactMatch);
+    } else if (modalMatchedCustomer && val !== modalMatchedCustomer.name) {
+      setModalMatchedCustomer(null);
+    }
+  };
+
+  // Helper para añadir o editar la cédula de un ticket existente
+  const handleEditCedula = (rec) => {
+    const current = rec.customerCedula || '';
+    const val = prompt(`Ingresa o edita la Cédula / C.I. para "${rec.customerName}":`, current);
+    if (val !== null && val.trim() !== current) {
+      updateDailyRecord(rec.id, { customerCedula: val.trim() });
+      setInlineSuccessToast(`🪪 Cédula actualizada para ${rec.customerName}: ${val.trim()}`);
+      setTimeout(() => setInlineSuccessToast(''), 3000);
+    }
+  };
 
   // Pagos
   const [paymentStatus, setPaymentStatus] = useState('paid'); // 'paid' | 'partial' | 'pending'
@@ -189,6 +399,7 @@ export default function EmployeeWorkStation() {
       date: selectedDate,
       time: time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       customerName: customerName.trim(),
+      customerCedula: customerCedula.trim(),
       customerPhone: customerPhone.trim(),
       washCount,
       dryCount,
@@ -221,7 +432,11 @@ export default function EmployeeWorkStation() {
     // Limpiar formulario
     setShowAddModal(false);
     setCustomerName('');
+    setCustomerCedula('');
     setCustomerPhone('');
+    setModalMatchedCustomer(null);
+    setModalShowCedulaSuggestions(false);
+    setModalShowNameSuggestions(false);
     setWashCount(1);
     setDryCount(1);
     setSoapCount(1);
@@ -282,6 +497,7 @@ export default function EmployeeWorkStation() {
       `_"El mejor servicio al mejor precio es nuestra mayor prioridad"_\n\n` +
       `📌 *N° de Ticket:* #TKT-${ticketId}\n` +
       `👤 *Cliente:* ${rec.customerName}\n` +
+      (rec.customerCedula ? `🪪 *C.I / Cédula:* ${rec.customerCedula}\n` : '') +
       `📅 *Fecha:* ${rec.date} · 🕒 ${rec.time}\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `🧺 *Servicio:* ${rec.notes || `${rec.washCount || 1} Cesta(s)`}\n` +
@@ -327,6 +543,7 @@ export default function EmployeeWorkStation() {
       `"El mejor servicio al mejor precio es nuestra mayor prioridad"\n\n` +
       `N° Ticket: #TKT-${ticketId}\n` +
       `Cliente: ${rec.customerName}\n` +
+      (rec.customerCedula ? `C.I / Cédula: ${rec.customerCedula}\n` : '') +
       `Fecha: ${rec.date} · ${rec.time}\n` +
       `Servicio: ${rec.notes || `${rec.washCount || 1} Cesta(s)`}\n` +
       `Total: $${(rec.totalUSD || 0).toFixed(2)} USD (Bs. ${(rec.totalBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })})\n` +
@@ -630,6 +847,7 @@ export default function EmployeeWorkStation() {
       date: selectedDate,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       customerName: inlineClientName.trim(),
+      customerCedula: inlineClientCedula.trim(),
       customerPhone: inlineClientPhone.trim(),
       washCount: finalWash,
       dryCount: finalDry,
@@ -657,7 +875,11 @@ export default function EmployeeWorkStation() {
     setTimeout(() => setInlineSuccessToast(''), 4000);
 
     setInlineClientName('');
+    setInlineClientCedula('');
     setInlineClientPhone('');
+    setInlineMatchedCustomer(null);
+    setInlineShowCedulaSuggestions(false);
+    setInlineShowNameSuggestions(false);
     setInlineBaskets(1);
     setInlineWashCount(1);
     setInlineDryCount(1);
@@ -751,6 +973,7 @@ export default function EmployeeWorkStation() {
     setIntakePaymentMethod(rec.paymentMethod || 'pago_movil');
     setIntakeBankRef(rec.bankReference && rec.bankReference !== 'Pedido por App' && rec.bankReference !== 'Pedido Web' ? rec.bankReference : '');
     setIntakeNotes(rec.notes || '');
+    setIntakeCedula(rec.customerCedula || '');
     setIntakeModalOpen(true);
   };
 
@@ -767,6 +990,7 @@ export default function EmployeeWorkStation() {
     let debtUSD = intakePaymentStatus === 'paid' ? 0 : adjustedTotalUSD;
 
     updateDailyRecord(recordForIntake.id, {
+      customerCedula: intakeCedula.trim(),
       washCount: intakeBaskets,
       dryCount: intakeBaskets,
       soapCount: intakeBaskets,
@@ -1161,10 +1385,97 @@ export default function EmployeeWorkStation() {
               </button>
             </div>
 
+            {/* Banner de Reconocimiento si el cliente ya está registrado en el sistema */}
+            {inlineMatchedCustomer && (
+              <div className="mb-3 p-2.5 px-3 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs shadow-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-xs shrink-0">
+                    ✓
+                  </span>
+                  <span className="font-black text-emerald-900">
+                    ¡Cliente Registrado!
+                  </span>
+                  <span className="font-bold text-emerald-800">
+                    {inlineMatchedCustomer.name}
+                  </span>
+                  {inlineMatchedCustomer.cedula && (
+                    <span className="font-mono text-[11px] bg-emerald-100/90 px-1.5 py-0.5 rounded text-emerald-900 font-bold border border-emerald-200">
+                      🪪 {inlineMatchedCustomer.cedula}
+                    </span>
+                  )}
+                  {inlineMatchedCustomer.phone && (
+                    <span className="font-mono text-[11px] text-emerald-700 font-semibold">
+                      📞 {inlineMatchedCustomer.phone}
+                    </span>
+                  )}
+                  {inlineMatchedCustomer.visits > 1 && (
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-1.5 py-0.5 rounded border border-amber-200">
+                      ⭐ {inlineMatchedCustomer.visits} visitas
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInlineMatchedCustomer(null);
+                    setInlineClientCedula('');
+                    setInlineClientName('');
+                    setInlineClientPhone('');
+                  }}
+                  className="text-[11px] text-emerald-700 hover:text-emerald-950 font-bold hover:underline shrink-0 ml-2"
+                >
+                  ✕ Limpiar / Nuevo
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleInlineQuickAdd} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-                {/* 1. Nombre del Cliente */}
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2.5 items-start">
+                {/* 0. Cédula del Cliente con autocompletado */}
+                <div className="relative">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Cédula / C.I.:
+                  </label>
+                  <input
+                    type="text"
+                    value={inlineClientCedula}
+                    onChange={(e) => handleInlineCedulaChange(e.target.value)}
+                    onFocus={() => {
+                      setInlineShowCedulaSuggestions(true);
+                      setInlineShowNameSuggestions(false);
+                    }}
+                    placeholder="Ej: V-18452331"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-base sm:text-xs font-mono font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  />
+                  {/* Desplegable de sugerencias por Cédula */}
+                  {inlineShowCedulaSuggestions && inlineClientCedula.trim().length >= 2 && getCedulaMatches(inlineClientCedula).length > 0 && (
+                    <div className="absolute top-full left-0 z-40 mt-1 w-64 bg-white border border-blue-200 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-100">
+                      <div className="p-1.5 px-2.5 bg-blue-50 text-[10px] font-bold text-blue-900 flex justify-between items-center">
+                        <span>✨ Clientes con esta Cédula:</span>
+                        <button type="button" onClick={() => setInlineShowCedulaSuggestions(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+                      </div>
+                      {getCedulaMatches(inlineClientCedula).map((client, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSelectCustomerInline(client)}
+                          className="w-full text-left p-2 hover:bg-blue-50/70 transition-colors flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <div className="font-bold text-slate-900">{client.name}</div>
+                            <div className="text-[10px] text-slate-500 font-mono">🪪 {client.cedula}</div>
+                          </div>
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Usar ➔
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 1. Nombre del Cliente con autocompletado */}
+                <div className="relative">
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Cliente *:
                   </label>
@@ -1172,20 +1483,41 @@ export default function EmployeeWorkStation() {
                     type="text"
                     required
                     value={inlineClientName}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setInlineClientName(val);
-                      const match = val.toLowerCase().match(/(\d+)\s*cesta/);
-                      if (match) {
-                        const num = parseInt(match[1], 10);
-                        if (num >= 1 && num <= 10) {
-                          handleInlineBasketsChange(num);
-                        }
-                      }
+                    onChange={(e) => handleInlineNameChange(e.target.value)}
+                    onFocus={() => {
+                      setInlineShowNameSuggestions(true);
+                      setInlineShowCedulaSuggestions(false);
                     }}
                     placeholder="Ej: Albert, Jenny..."
-                    className="w-full px-3.5 py-2.5 sm:py-2 rounded-xl border border-slate-200 text-base sm:text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-base sm:text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                   />
+                  {/* Desplegable de sugerencias por Nombre */}
+                  {inlineShowNameSuggestions && inlineClientName.trim().length >= 2 && getNameMatches(inlineClientName).length > 0 && (
+                    <div className="absolute top-full left-0 z-40 mt-1 w-64 bg-white border border-blue-200 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-100">
+                      <div className="p-1.5 px-2.5 bg-blue-50 text-[10px] font-bold text-blue-900 flex justify-between items-center">
+                        <span>✨ Clientes existentes:</span>
+                        <button type="button" onClick={() => setInlineShowNameSuggestions(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+                      </div>
+                      {getNameMatches(inlineClientName).map((client, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSelectCustomerInline(client)}
+                          className="w-full text-left p-2 hover:bg-blue-50/70 transition-colors flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <div className="font-bold text-slate-900">{client.name}</div>
+                            <div className="text-[10px] text-slate-500 font-mono">
+                              {client.cedula ? `🪪 ${client.cedula}` : ''} {client.phone ? `📞 ${client.phone}` : ''}
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Usar ➔
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Teléfono */}
@@ -1198,7 +1530,7 @@ export default function EmployeeWorkStation() {
                     value={inlineClientPhone}
                     onChange={(e) => setInlineClientPhone(e.target.value)}
                     placeholder="Ej: 0412..."
-                    className="w-full px-3.5 py-2.5 sm:py-2 rounded-xl border border-slate-200 text-base sm:text-xs font-mono text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-base sm:text-xs font-mono text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                   />
                 </div>
 
@@ -1780,15 +2112,36 @@ export default function EmployeeWorkStation() {
                             🕒 {rec.time}
                           </span>
                         </div>
-                        {rec.customerPhone && (
-                          <a 
-                            href={`tel:${rec.customerPhone}`}
-                            className="inline-flex items-center gap-1 text-xs text-blue-600 font-mono font-bold mt-1 hover:underline"
-                          >
-                            <Phone size={12} />
-                            <span>{rec.customerPhone}</span>
-                          </a>
-                        )}
+                        <div className="flex items-center gap-2 flex-wrap mt-1">
+                          {rec.customerCedula ? (
+                            <button
+                              type="button"
+                              onClick={() => handleEditCedula(rec)}
+                              title="Toca para editar la cédula"
+                              className="inline-flex items-center gap-1 font-mono text-[11px] font-black text-slate-800 bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded-md border border-slate-200 transition-colors"
+                            >
+                              🪪 {rec.customerCedula}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleEditCedula(rec)}
+                              className="text-[10px] text-blue-600 hover:text-blue-800 font-bold bg-blue-50 hover:bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200 transition-colors"
+                              title="Asignar cédula a este cliente"
+                            >
+                              + Añadir C.I.
+                            </button>
+                          )}
+                          {rec.customerPhone && (
+                            <a 
+                              href={`tel:${rec.customerPhone}`}
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 font-mono font-bold hover:underline"
+                            >
+                              <Phone size={12} />
+                              <span>{rec.customerPhone}</span>
+                            </a>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -2010,7 +2363,7 @@ export default function EmployeeWorkStation() {
                           {rec.time}
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <p className="font-extrabold text-slate-900 text-sm">{rec.customerName}</p>
                             {rec.origin === 'app' ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
@@ -2022,9 +2375,30 @@ export default function EmployeeWorkStation() {
                               </span>
                             )}
                           </div>
-                          {rec.customerPhone && (
-                            <div className="flex items-center gap-2 mt-0.5">
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {rec.customerCedula ? (
+                              <button
+                                type="button"
+                                onClick={() => handleEditCedula(rec)}
+                                title="Clic para modificar cédula"
+                                className="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded border border-slate-200 transition-colors"
+                              >
+                                🪪 {rec.customerCedula}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleEditCedula(rec)}
+                                className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline"
+                                title="Asignar cédula a este cliente"
+                              >
+                                + C.I.
+                              </button>
+                            )}
+                            {rec.customerPhone && (
                               <span className="text-[10px] text-slate-500 font-mono">{rec.customerPhone}</span>
+                            )}
+                            {rec.customerPhone && (
                               <button
                                 type="button"
                                 onClick={() => notifyCustomerWhatsApp(rec)}
@@ -2033,16 +2407,16 @@ export default function EmployeeWorkStation() {
                               >
                                 <MessageCircle size={10} /> Avisar
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => openReceiptModal(rec)}
-                                className="text-[10px] text-blue-600 font-bold hover:underline flex items-center gap-0.5 ml-1"
-                                title="Ver comprobante de pago para este cliente"
-                              >
-                                <FileText size={10} /> Recibo
-                              </button>
-                            </div>
-                          )}
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => openReceiptModal(rec)}
+                              className="text-[10px] text-blue-600 font-bold hover:underline flex items-center gap-0.5"
+                              title="Ver comprobante de pago para este cliente"
+                            >
+                              <FileText size={10} /> Recibo
+                            </button>
+                          </div>
                           {rec.notes && (
                             <p className="text-[10px] text-amber-700 font-medium italic mt-0.5">
                               {rec.notes}
@@ -2521,8 +2895,52 @@ export default function EmployeeWorkStation() {
               </button>
             </div>
 
+            {/* Banner de Reconocimiento si el cliente ya está registrado en el sistema */}
+            {modalMatchedCustomer && (
+              <div className="mb-3 p-2.5 px-3 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs shadow-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-xs shrink-0">
+                    ✓
+                  </span>
+                  <span className="font-black text-emerald-900">
+                    ¡Cliente Registrado!
+                  </span>
+                  <span className="font-bold text-emerald-800">
+                    {modalMatchedCustomer.name}
+                  </span>
+                  {modalMatchedCustomer.cedula && (
+                    <span className="font-mono text-[11px] bg-emerald-100/90 px-1.5 py-0.5 rounded text-emerald-900 font-bold border border-emerald-200">
+                      🪪 {modalMatchedCustomer.cedula}
+                    </span>
+                  )}
+                  {modalMatchedCustomer.phone && (
+                    <span className="font-mono text-[11px] text-emerald-700 font-semibold">
+                      📞 {modalMatchedCustomer.phone}
+                    </span>
+                  )}
+                  {modalMatchedCustomer.visits > 1 && (
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-1.5 py-0.5 rounded border border-amber-200">
+                      ⭐ {modalMatchedCustomer.visits} visitas
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalMatchedCustomer(null);
+                    setCustomerCedula('');
+                    setCustomerName('');
+                    setCustomerPhone('');
+                  }}
+                  className="text-[11px] text-emerald-700 hover:text-emerald-950 font-bold hover:underline shrink-0 ml-2"
+                >
+                  ✕ Limpiar / Nuevo
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleCreateRecord} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Hora:</label>
                   <input
@@ -2533,32 +2951,89 @@ export default function EmployeeWorkStation() {
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
                   />
                 </div>
-                <div>
+                {/* Cédula del Cliente con autocompletado */}
+                <div className="relative">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Cédula / C.I.:</label>
+                  <input
+                    type="text"
+                    value={customerCedula}
+                    onChange={(e) => handleModalCedulaChange(e.target.value)}
+                    onFocus={() => {
+                      setModalShowCedulaSuggestions(true);
+                      setModalShowNameSuggestions(false);
+                    }}
+                    placeholder="Ej: V-18452331"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
+                  />
+                  {/* Desplegable de sugerencias por Cédula */}
+                  {modalShowCedulaSuggestions && customerCedula.trim().length >= 2 && getCedulaMatches(customerCedula).length > 0 && (
+                    <div className="absolute top-full left-0 z-40 mt-1 w-64 bg-white border border-blue-200 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-100">
+                      <div className="p-1.5 px-2 bg-blue-50 text-[10px] font-bold text-blue-900 flex justify-between items-center">
+                        <span>✨ Clientes con esta Cédula:</span>
+                        <button type="button" onClick={() => setModalShowCedulaSuggestions(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+                      </div>
+                      {getCedulaMatches(customerCedula).map((client, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSelectCustomerModal(client)}
+                          className="w-full text-left p-2 hover:bg-blue-50/70 transition-colors flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <div className="font-bold text-slate-900">{client.name}</div>
+                            <div className="text-[10px] text-slate-500 font-mono">🪪 {client.cedula}</div>
+                          </div>
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Usar ➔
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Nombre del Cliente con autocompletado */}
+                <div className="relative">
                   <label className="block text-xs font-bold text-slate-700 mb-1">Nombre del Cliente *:</label>
                   <input
                     type="text"
                     required
                     autoFocus
                     value={customerName}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCustomerName(val);
-                      const match = val.toLowerCase().match(/(\d+)\s*cesta/);
-                      if (match) {
-                        const num = parseInt(match[1], 10);
-                        if (num >= 1 && num <= 10) {
-                          setWashCount(num);
-                          setDryCount(num);
-                          setSoapCount(num);
-                          setLaborCount(num);
-                          setSoftenerCount(num);
-                          setManualTotalUSD((num * (prices.comboFull || 7.50)).toFixed(2));
-                        }
-                      }
+                    onChange={(e) => handleModalNameChange(e.target.value)}
+                    onFocus={() => {
+                      setModalShowNameSuggestions(true);
+                      setModalShowCedulaSuggestions(false);
                     }}
                     placeholder="Ej: Albert, Jenny, Enrique..."
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
                   />
+                  {/* Desplegable de sugerencias por Nombre */}
+                  {modalShowNameSuggestions && customerName.trim().length >= 2 && getNameMatches(customerName).length > 0 && (
+                    <div className="absolute top-full left-0 z-40 mt-1 w-64 bg-white border border-blue-200 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-100">
+                      <div className="p-1.5 px-2 bg-blue-50 text-[10px] font-bold text-blue-900 flex justify-between items-center">
+                        <span>✨ Clientes existentes:</span>
+                        <button type="button" onClick={() => setModalShowNameSuggestions(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+                      </div>
+                      {getNameMatches(customerName).map((client, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSelectCustomerModal(client)}
+                          className="w-full text-left p-2 hover:bg-blue-50/70 transition-colors flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <div className="font-bold text-slate-900">{client.name}</div>
+                            <div className="text-[10px] text-slate-500 font-mono">
+                              {client.cedula ? `🪪 ${client.cedula}` : ''} {client.phone ? `📞 ${client.phone}` : ''}
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Usar ➔
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Teléfono (Opcional):</label>
@@ -2994,6 +3469,20 @@ export default function EmployeeWorkStation() {
             </div>
 
             <form onSubmit={handleConfirmIntake} className="space-y-4">
+              {/* Cédula del Cliente */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Cédula / C.I. del Cliente:
+                </label>
+                <input
+                  type="text"
+                  value={intakeCedula}
+                  onChange={(e) => setIntakeCedula(e.target.value)}
+                  placeholder="Ej: V-18452331"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-900 bg-slate-50 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
               {/* Ajuste de Cestas */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                 <div>
@@ -3603,6 +4092,14 @@ export default function EmployeeWorkStation() {
                   <span className="text-slate-500 font-bold uppercase text-[10px]">Cliente:</span>
                   <strong className="text-slate-900 font-black text-sm">{receiptRecord.customerName}</strong>
                 </div>
+                {receiptRecord.customerCedula && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-bold uppercase text-[10px]">C.I. / Cédula:</span>
+                    <span className="font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      🪪 {receiptRecord.customerCedula}
+                    </span>
+                  </div>
+                )}
                 {receiptRecord.customerPhone && (
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 font-bold uppercase text-[10px]">Teléfono:</span>

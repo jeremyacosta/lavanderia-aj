@@ -8,7 +8,8 @@ export default function CustomerCRM() {
 
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.phone.includes(searchTerm)
+    c.phone.includes(searchTerm) ||
+    (c.cedula && c.cedula.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const openWhatsAppChat = (phone, name) => {
@@ -30,7 +31,7 @@ export default function CustomerCRM() {
             Directorio de Clientes
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Registro de visitas, historial de pedidos y acceso directo a chat de WhatsApp.
+            Registro de visitas, cédula de identidad, historial de pedidos y WhatsApp.
           </p>
         </div>
 
@@ -40,7 +41,7 @@ export default function CustomerCRM() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por nombre o teléfono..."
+            placeholder="Buscar por cédula, nombre o teléfono..."
             className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -70,7 +71,18 @@ export default function CustomerCRM() {
                 </div>
 
                 <h3 className="text-lg font-black text-slate-900 mb-1">{cust.name}</h3>
-                <p className="text-xs text-blue-700 font-mono mb-3 font-semibold">{cust.phone}</p>
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {cust.cedula && (
+                    <span className="text-xs font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                      🪪 {cust.cedula}
+                    </span>
+                  )}
+                  {cust.phone && (
+                    <span className="text-xs text-blue-700 font-mono font-semibold">
+                      📞 {cust.phone}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-600 mb-6 bg-slate-50 p-2.5 rounded-xl border border-slate-200/70">
                   {cust.notes || 'Sin observaciones'}
                 </p>

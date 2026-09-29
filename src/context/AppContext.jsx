@@ -105,7 +105,8 @@ export function normalizeRecordServices(r) {
     laborCount: isNaN(labor) ? 1 : labor,
     softenerCount: isNaN(softener) ? (dry > 0 ? (wash > 0 ? wash : dry) : 0) : softener,
     bleachCount: bleach,
-    degreaserCount: degreaser
+    degreaserCount: degreaser,
+    customerCedula: r.customerCedula || ''
   };
 }
 
@@ -208,9 +209,9 @@ export function AppProvider({ children }) {
   const [customers, setCustomers] = useState(() => {
     const saved = localStorage.getItem('aj_customers');
     return saved ? JSON.parse(saved) : [
-      { id: 'c1', name: 'Carlos Rodríguez', phone: '04141234567', visits: 4, notes: 'Cliente frecuente, prefiere poco suavizante' },
-      { id: 'c2', name: 'María Fernández', phone: '04247654321', visits: 2, notes: 'Trae edredones dobles' },
-      { id: 'c3', name: 'Línea de Transporte Unión', phone: '04129988776', visits: 5, notes: 'Forros de autobús completos' }
+      { id: 'c1', name: 'Carlos Rodríguez', cedula: 'V-18452331', phone: '04141234567', visits: 4, notes: 'Cliente frecuente, prefiere poco suavizante' },
+      { id: 'c2', name: 'María Fernández', cedula: 'V-20119854', phone: '04247654321', visits: 2, notes: 'Trae edredones dobles' },
+      { id: 'c3', name: 'Línea de Transporte Unión', cedula: 'J-31456789-0', phone: '04129988776', visits: 5, notes: 'Forros de autobús completos' }
     ];
   });
 
@@ -623,22 +624,40 @@ export function AppProvider({ children }) {
     const orderWithId = {
       ...newOrder,
       id: nextId,
+      customerCedula: newOrder.customerCedula ? newOrder.customerCedula.trim() : '',
       date: newOrder.date || new Date().toISOString().split('T')[0],
       time: newOrder.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
     setOrders([orderWithId, ...orders]);
 
     // Actualizar o crear cliente
-    const existingIndex = customers.findIndex(c => c.phone.trim() === newOrder.customerPhone.trim());
+    const normCedula = (orderWithId.customerCedula || '').trim().toLowerCase();
+    const normPhone = (orderWithId.customerPhone || '').replace(/\D/g, '');
+    const normName = (orderWithId.customerName || '').trim().toLowerCase();
+
+    const existingIndex = customers.findIndex(c => {
+      const cCedula = (c.cedula || '').trim().toLowerCase();
+      const cPhone = (c.phone || '').replace(/\D/g, '');
+      const cName = (c.name || '').trim().toLowerCase();
+      if (normCedula && cCedula && normCedula === cCedula) return true;
+      if (normPhone && cPhone && normPhone === cPhone) return true;
+      if (normName && cName && normName === cName) return true;
+      return false;
+    });
+
     if (existingIndex >= 0) {
       const updated = [...customers];
-      updated[existingIndex].visits = (updated[existingIndex].visits || 1) + 1;
+      const target = updated[existingIndex];
+      target.visits = (target.visits || 1) + 1;
+      if (orderWithId.customerCedula && !target.cedula) target.cedula = orderWithId.customerCedula;
+      if (orderWithId.customerPhone && (!target.phone || target.phone === 'En mostrador')) target.phone = orderWithId.customerPhone;
       setCustomers(updated);
-    } else if (newOrder.customerName) {
+    } else if (orderWithId.customerName) {
       setCustomers([...customers, {
         id: `c_${Date.now()}`,
-        name: newOrder.customerName,
-        phone: newOrder.customerPhone,
+        name: orderWithId.customerName,
+        cedula: orderWithId.customerCedula || '',
+        phone: orderWithId.customerPhone || '',
         visits: 1,
         notes: 'Cliente registrado vía ticket'
       }]);
@@ -723,6 +742,7 @@ export function AppProvider({ children }) {
     const record = normalizeRecordServices({
       ...newRecord,
       id: nextId,
+      customerCedula: newRecord.customerCedula ? newRecord.customerCedula.trim() : '',
       date: recDate,
       time: newRecord.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       paymentDate: isPaid ? (newRecord.paymentDate || recDate) : null,
@@ -735,6 +755,7 @@ export function AppProvider({ children }) {
       id: `AJ-${nextId.slice(4)}`,
       originalId: nextId,
       customerName: record.customerName,
+      customerCedula: record.customerCedula || '',
       customerPhone: record.customerPhone || 'En mostrador',
       date: record.date,
       time: record.time,
@@ -762,20 +783,37 @@ export function AppProvider({ children }) {
     };
     setOrders(prev => [orderFormat, ...prev]);
 
-    // Si se incluye teléfono o nombre, sincronizar con clientes
-    if (newRecord.customerPhone) {
-      const existing = customers.find(c => c.phone.trim() === newRecord.customerPhone.trim());
-      if (existing) {
-        setCustomers(customers.map(c => c.phone.trim() === newRecord.customerPhone.trim() ? { ...c, visits: (c.visits || 1) + 1 } : c));
-      } else if (newRecord.customerName) {
-        setCustomers([{
-          id: `c_${Date.now()}`,
-          name: newRecord.customerName,
-          phone: newRecord.customerPhone,
-          visits: 1,
-          notes: 'Registrado desde el mostrador / cuaderno'
-        }, ...customers]);
-      }
+    // Si se incluye cédula, teléfono o nombre, sincronizar con clientes
+    const normCedula = (record.customerCedula || '').trim().toLowerCase();
+    const normPhone = (record.customerPhone || '').replace(/\D/g, '');
+    const normName = (record.customerName || '').trim().toLowerCase();
+
+    const existingIndex = customers.findIndex(c => {
+      const cCedula = (c.cedula || '').trim().toLowerCase();
+      const cPhone = (c.phone || '').replace(/\D/g, '');
+      const cName = (c.name || '').trim().toLowerCase();
+      if (normCedula && cCedula && normCedula === cCedula) return true;
+      if (normPhone && cPhone && normPhone === cPhone) return true;
+      if (normName && cName && normName === cName) return true;
+      return false;
+    });
+
+    if (existingIndex >= 0) {
+      const updated = [...customers];
+      const target = updated[existingIndex];
+      target.visits = (target.visits || 1) + 1;
+      if (record.customerCedula && !target.cedula) target.cedula = record.customerCedula;
+      if (record.customerPhone && (!target.phone || target.phone === 'En mostrador')) target.phone = record.customerPhone;
+      setCustomers(updated);
+    } else if (record.customerName && record.customerName !== 'Cliente sin nombre') {
+      setCustomers(prev => [{
+        id: `c_${Date.now()}`,
+        name: record.customerName,
+        cedula: record.customerCedula || '',
+        phone: record.customerPhone || '',
+        visits: 1,
+        notes: 'Registrado desde el mostrador / cuaderno'
+      }, ...prev]);
     }
 
     // Sincronizar de inmediato a la nube
@@ -795,6 +833,21 @@ export function AppProvider({ children }) {
       }
       return prev;
     });
+
+    // Si se actualizó la cédula, actualizar también el cliente en el CRM
+    if (updatedFields.customerCedula) {
+      setCustomers(prev => {
+        const targetRec = dailyRecords.find(r => r.id === id);
+        const name = (targetRec?.customerName || '').toLowerCase().trim();
+        const phone = (targetRec?.customerPhone || '').replace(/\D/g, '');
+        return prev.map(c => {
+          if ((phone && c.phone && c.phone.replace(/\D/g, '') === phone) || (name && c.name.toLowerCase().trim() === name)) {
+            return { ...c, cedula: updatedFields.customerCedula.trim() };
+          }
+          return c;
+        });
+      });
+    }
 
     // Sincronizar en órdenes
     setOrders(prev => prev.map(o => {

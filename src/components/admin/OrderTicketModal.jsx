@@ -5,8 +5,12 @@ import { Plus, Check, MessageSquare, DollarSign, Calendar, User, Phone, Tag, Shi
 export default function OrderTicketModal({ isOpen, onClose }) {
   const { prices, exchangeRate, addOrder, customers } = useApp();
 
+  const [customerCedula, setCustomerCedula] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [matchedCustomer, setMatchedCustomer] = useState(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   const [baskets, setBaskets] = useState(1);
   const [servicePackage, setServicePackage] = useState('comboFull'); // 'comboFull' | 'washWithSoap' | 'washOnly' | 'dryOnly' | 'comforterSingle' | 'comforterDouble' | 'comforterLarge' | 'busCovers'
   const [customPriceUSD, setCustomPriceUSD] = useState('');
@@ -15,6 +19,25 @@ export default function OrderTicketModal({ isOpen, onClose }) {
   const [notes, setNotes] = useState('');
 
   if (!isOpen) return null;
+
+  // Filtrar sugerencias de clientes registrados
+  const matchingCustomers = (customers || []).filter(c => {
+    const qCed = customerCedula.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const qName = customerName.trim().toLowerCase();
+    const cCed = (c.cedula || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cName = (c.name || '').toLowerCase();
+    if (qCed.length >= 2 && cCed.includes(qCed)) return true;
+    if (qName.length >= 2 && cName.includes(qName)) return true;
+    return false;
+  }).slice(0, 4);
+
+  const handleSelectCustomer = (client) => {
+    setCustomerCedula(client.cedula || '');
+    setCustomerName(client.name || '');
+    setCustomerPhone(client.phone || '');
+    setMatchedCustomer(client);
+    setShowSuggestions(false);
+  };
 
   // Calcular precio según paquete
   let calculatedTotal = 0;
@@ -50,6 +73,7 @@ export default function OrderTicketModal({ isOpen, onClose }) {
 
     const newOrder = addOrder({
       customerName,
+      customerCedula: customerCedula.trim(),
       customerPhone,
       itemsSummary: packageNames[servicePackage],
       totalUSD,
@@ -66,6 +90,7 @@ export default function OrderTicketModal({ isOpen, onClose }) {
       const msg = `🧾 *COMPROBANTE DE SERVICIO - LAVANDERÍA AJ*\n\n` +
         `*Ticket:* #${newOrder.id}\n` +
         `*Cliente:* ${customerName}\n` +
+        (customerCedula ? `*C.I / Cédula:* ${customerCedula}\n` : '') +
         `*Servicio:* ${packageNames[servicePackage]}\n` +
         `*Total:* $${totalUSD.toFixed(2)} USD (Bs. ${totalBs.toFixed(2)})\n` +
         `*Estado de Pago:* ${paymentStatus === 'paid' ? '✅ PAGADO' : '⏳ PENDIENTE POR PAGAR AL RETIRAR'}\n\n` +
@@ -96,22 +121,65 @@ export default function OrderTicketModal({ isOpen, onClose }) {
           <h2 className="text-xl font-black text-slate-900">Nuevo Ticket de Recepción</h2>
         </div>
 
+        {/* Reconocimiento de cliente registrado */}
+        {matchedCustomer && (
+          <div className="mb-4 p-2.5 px-3 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">✓</span>
+              <div>
+                <span className="font-black">¡Cliente Registrado!</span>
+                <span className="ml-1 font-bold">{matchedCustomer.name}</span>
+                {matchedCustomer.visits > 1 && (
+                  <span className="ml-1 text-[11px] text-emerald-700 font-bold">({matchedCustomer.visits} visitas)</span>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setMatchedCustomer(null); setCustomerCedula(''); setCustomerName(''); setCustomerPhone(''); }}
+              className="text-[11px] text-emerald-700 hover:text-emerald-900 font-bold hover:underline"
+            >
+              Limpiar
+            </button>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Cliente */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Nombre del Cliente *</label>
+          {/* Cliente: Cédula, Nombre y Teléfono */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative">
+            <div className="relative">
+              <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Cédula / C.I.</label>
+              <input
+                type="text"
+                value={customerCedula}
+                onChange={(e) => {
+                  setCustomerCedula(e.target.value);
+                  setShowSuggestions(true);
+                  if (matchedCustomer && e.target.value !== matchedCustomer.cedula) setMatchedCustomer(null);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                placeholder="Ej: V-18452331"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-blue-500 font-mono"
+              />
+            </div>
+            <div className="relative">
+              <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Nombre *</label>
               <input
                 type="text"
                 required
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                onChange={(e) => {
+                  setCustomerName(e.target.value);
+                  setShowSuggestions(true);
+                  if (matchedCustomer && e.target.value !== matchedCustomer.name) setMatchedCustomer(null);
+                }}
+                onFocus={() => setShowSuggestions(true)}
                 placeholder="Ej. Juan Pérez"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-blue-500 font-bold"
               />
             </div>
             <div>
-              <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">Teléfono WhatsApp *</label>
+              <label className="text-xs font-mono text-slate-600 font-semibold block mb-1">WhatsApp *</label>
               <input
                 type="tel"
                 required
@@ -121,6 +189,35 @@ export default function OrderTicketModal({ isOpen, onClose }) {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-blue-500 font-mono"
               />
             </div>
+
+            {/* Desplegable de sugerencias de clientes */}
+            {showSuggestions && matchingCustomers.length > 0 && (
+              <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-blue-200 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-100">
+                <div className="p-2 bg-blue-50 text-[11px] font-bold text-blue-900 flex justify-between items-center">
+                  <span>✨ Clientes registrados encontrados:</span>
+                  <button type="button" onClick={() => setShowSuggestions(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+                </div>
+                {matchingCustomers.map(client => (
+                  <button
+                    key={client.id || client.phone}
+                    type="button"
+                    onClick={() => handleSelectCustomer(client)}
+                    className="w-full text-left p-2.5 hover:bg-blue-50/60 transition-colors flex items-center justify-between text-xs"
+                  >
+                    <div>
+                      <strong className="text-slate-900 font-bold">{client.name}</strong>
+                      <div className="text-[11px] text-slate-500 font-mono flex gap-2">
+                        {client.cedula && <span>🪪 {client.cedula}</span>}
+                        {client.phone && <span>📞 {client.phone}</span>}
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Cargar Datos ➔
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Servicio */}
