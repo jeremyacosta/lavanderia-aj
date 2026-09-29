@@ -13,7 +13,7 @@ export default function AccountingDashboard() {
     orders, expenses, exchangeRate, setExchangeRate, 
     updateOrderStatus, updatePaymentStatus, addExpense,
     auditLogs, dailyClosures, detergentLogs, dailyRecords,
-    isCloudConnected, setIsCloudConnected
+    isCloudConnected, setIsCloudConnected, resetSystemToCleanState
   } = useApp();
 
   const [showCloudModal, setShowCloudModal] = useState(false);
@@ -22,6 +22,17 @@ export default function AccountingDashboard() {
   const [customProjectId, setCustomProjectId] = useState('');
   const [cloudSyncStatusMsg, setCloudSyncStatusMsg] = useState('');
   const [isUploadingLocal, setIsUploadingLocal] = useState(false);
+
+  // Modal de Puesta a Cero / Iniciar Operaciones Reales
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetAdminPassword, setResetAdminPassword] = useState('');
+  const [resetClearTickets, setResetClearTickets] = useState(true);
+  const [resetClearClosures, setResetClearClosures] = useState(true);
+  const [resetClearDetergents, setResetClearDetergents] = useState(true);
+  const [resetClearExpenses, setResetClearExpenses] = useState(true);
+  const [resetClearCustomers, setResetClearCustomers] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetResultMsg, setResetResultMsg] = useState({ text: '', type: '' });
 
   // Función ultra-robusta para auto-detectar campos de cualquier texto que pegue el usuario
   const autoParseFirebaseText = (text) => {
@@ -228,6 +239,21 @@ export default function AccountingDashboard() {
           >
             <span className="text-base">{isCloudConnected ? '☁️' : '⚠️'}</span>
             <span>{isCloudConnected ? 'Nube Activa (En Vivo)' : 'Sincronizar Teléfonos'}</span>
+          </button>
+
+          {/* Puesta a Cero / Iniciar Operaciones Reales */}
+          <button
+            type="button"
+            onClick={() => {
+              setResetResultMsg({ text: '', type: '' });
+              setResetAdminPassword('');
+              setShowResetModal(true);
+            }}
+            className="px-3.5 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 shadow-xs"
+            title="Limpiar datos de prueba y poner el sistema a cero para comenzar operaciones reales"
+          >
+            <span className="text-base">🧹</span>
+            <span>Poner a Cero</span>
           </button>
 
           {/* New Ticket Button */}
@@ -968,6 +994,19 @@ export default function AccountingDashboard() {
                 <button
                   type="button"
                   onClick={() => {
+                    setShowCloudModal(false);
+                    setResetResultMsg({ text: '', type: '' });
+                    setResetAdminPassword('');
+                    setShowResetModal(true);
+                  }}
+                  className="w-full py-2.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <span>🧹 Puesta a Cero de Datos en la Nube y Este Equipo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
                     if (window.confirm('¿Deseas desconectar la base de datos de la nube en este dispositivo?')) {
                       localStorage.removeItem('aj_firebase_config');
                       setIsCloudConnected(false);
@@ -1128,6 +1167,225 @@ export default function AccountingDashboard() {
                 {cloudSyncStatusMsg}
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Puesta a Cero / Iniciar Operaciones Reales */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-rose-100 relative my-8 animate-in fade-in zoom-in duration-150">
+            {/* Botón Cerrar */}
+            <button
+              onClick={() => setShowResetModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-colors"
+            >
+              ✕
+            </button>
+
+            {/* Encabezado */}
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-2xl shadow-xs">
+                🧹
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">
+                  Puesta a Cero del Sistema
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Limpieza de pruebas para inicio de operaciones reales en lavandería
+                </p>
+              </div>
+            </div>
+
+            {/* Explicación clara */}
+            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200/80 text-xs text-rose-950 space-y-1.5 mb-4">
+              <p className="font-bold flex items-center gap-1.5 text-rose-900">
+                <span>⚠️ ¿Para qué sirve esta acción?</span>
+              </p>
+              <p className="text-[11px] leading-relaxed text-rose-800">
+                Borra los tickets, cobros y registros simulados para que tu contabilidad y tu cuaderno comiencen 100% limpios.
+                {isCloudConnected 
+                  ? ' Como tienes la NUBE ACTIVA, se vaciará también en Google Cloud Firestore para que todos tus teléfonos y laptops queden limpios y sincronizados al instante.' 
+                  : ' Se limpiarán los datos en este equipo para comenzar desde cero.'}
+              </p>
+            </div>
+
+            {/* Checkboxes de qué limpiar */}
+            <div className="space-y-2 mb-4 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider block mb-2">
+                Selecciona qué deseas limpiar:
+              </span>
+
+              {/* Tickets y Cuaderno */}
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={resetClearTickets}
+                  onChange={(e) => setResetClearTickets(e.target.checked)}
+                  className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800">
+                    🧺 Tickets de Servicio & Cuaderno Diario ({dailyRecords.length} registros)
+                  </span>
+                  <p className="text-[10px] text-slate-500">
+                    Limpia todas las órdenes de lavado/secado de prueba.
+                  </p>
+                </div>
+              </label>
+
+              {/* Cierres Diarios */}
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={resetClearClosures}
+                  onChange={(e) => setResetClearClosures(e.target.checked)}
+                  className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800">
+                    📊 Cierres Diarios de Caja ({dailyClosures.length} cierres)
+                  </span>
+                  <p className="text-[10px] text-slate-500">
+                    Limpia los cuadres de caja simulados.
+                  </p>
+                </div>
+              </label>
+
+              {/* Apertura de Detergentes */}
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={resetClearDetergents}
+                  onChange={(e) => setResetClearDetergents(e.target.checked)}
+                  className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800">
+                    🧴 Control de Insumos & Detergentes ({detergentLogs.length} notas)
+                  </span>
+                  <p className="text-[10px] text-slate-500">
+                    Limpia las aperturas de botellones y cuñetes de prueba.
+                  </p>
+                </div>
+              </label>
+
+              {/* Gastos */}
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={resetClearExpenses}
+                  onChange={(e) => setResetClearExpenses(e.target.checked)}
+                  className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800">
+                    📉 Gastos Operativos ({expenses.length} gastos)
+                  </span>
+                  <p className="text-[10px] text-slate-500">
+                    Limpia los gastos y compras de prueba.
+                  </p>
+                </div>
+              </label>
+
+              {/* Clientes Registrados */}
+              <label className="flex items-start gap-2.5 cursor-pointer select-none pt-2 border-t border-slate-200">
+                <input
+                  type="checkbox"
+                  checked={resetClearCustomers}
+                  onChange={(e) => setResetClearCustomers(e.target.checked)}
+                  className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800">
+                    👥 Limpiar también la Cartera de Clientes
+                  </span>
+                  <p className="text-[10px] text-slate-500">
+                    {resetClearCustomers 
+                      ? '⚠️ Se borrarán todos los clientes para empezar con la agenda en blanco.' 
+                      : '✓ Recomendado: Dejar desmarcado para conservar a los clientes reales ya registrados con su cédula.'}
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Contraseña de Administrador */}
+            <div className="mb-4">
+              <label className="block text-xs font-black text-slate-800 mb-1">
+                🔒 Contraseña de Administrador *:
+              </label>
+              <input
+                type="password"
+                value={resetAdminPassword}
+                onChange={(e) => setResetAdminPassword(e.target.value)}
+                placeholder="Ingresa aj2026 o 1234"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-rose-500 transition-all"
+              />
+              <span className="text-[10px] text-slate-400 mt-1 block">
+                Clave de seguridad autorizada: <code className="font-mono font-bold text-slate-600">aj2026</code> o <code className="font-mono font-bold text-slate-600">1234</code>
+              </span>
+            </div>
+
+            {/* Mensajes de resultado */}
+            {resetResultMsg.text && (
+              <div className={`p-3 rounded-xl mb-4 text-xs font-bold ${
+                resetResultMsg.type === 'success' 
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                  : resetResultMsg.type === 'info'
+                  ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                  : 'bg-rose-50 text-rose-800 border border-rose-200'
+              }`}>
+                {resetResultMsg.text}
+              </div>
+            )}
+
+            {/* Botones de acción */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                disabled={isResetting}
+                className="flex-1 py-3 rounded-2xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-100 transition-colors"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={isResetting || !resetAdminPassword.trim()}
+                onClick={async () => {
+                  if (!resetAdminPassword.trim()) {
+                    setResetResultMsg({ text: 'Por favor ingresa la contraseña de administrador.', type: 'error' });
+                    return;
+                  }
+
+                  setIsResetting(true);
+                  setResetResultMsg({ text: 'Limpiando datos en local y en la nube...', type: 'info' });
+
+                  const res = await resetSystemToCleanState(resetAdminPassword, {
+                    clearTickets: resetClearTickets,
+                    clearClosures: resetClearClosures,
+                    clearDetergents: resetClearDetergents,
+                    clearExpenses: resetClearExpenses,
+                    clearCustomers: resetClearCustomers
+                  });
+
+                  setIsResetting(false);
+                  if (res.success) {
+                    setResetResultMsg({ text: res.message, type: 'success' });
+                    setTimeout(() => {
+                      setShowResetModal(false);
+                    }, 2200);
+                  } else {
+                    setResetResultMsg({ text: res.message, type: 'error' });
+                  }
+                }}
+                className="flex-1 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-extrabold text-xs uppercase shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all"
+              >
+                <span>{isResetting ? '⏳ Limpiando...' : '🧹 Confirmar y Poner a Cero'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import {
   doc, 
   setDoc, 
   deleteDoc, 
+  getDocs,
   onSnapshot
 } from 'firebase/firestore';
 
@@ -89,6 +90,25 @@ export async function deleteDocFromCloud(collectionName, docId) {
     return true;
   } catch (err) {
     console.error(`[Firebase Delete Error ${collectionName}/${docId}]:`, err);
+    return false;
+  }
+}
+
+// Elimina todos los documentos de una colección en Firestore
+export async function clearCollectionFromCloud(collectionName) {
+  const db = getDb();
+  if (!db) return false;
+  try {
+    const colRef = collection(db, collectionName);
+    const snap = await getDocs(colRef);
+    const promises = [];
+    snap.forEach((docSnap) => {
+      promises.push(deleteDoc(doc(db, collectionName, docSnap.id)));
+    });
+    await Promise.all(promises);
+    return true;
+  } catch (err) {
+    console.error(`[Firebase Clear Collection Error ${collectionName}]:`, err);
     return false;
   }
 }

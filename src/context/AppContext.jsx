@@ -4,6 +4,7 @@ import {
   getFirebaseConfig, 
   syncDocToCloud, 
   deleteDocFromCloud, 
+  clearCollectionFromCloud,
   subscribeToCollection 
 } from '../services/firebase';
 
@@ -207,8 +208,18 @@ export function AppProvider({ children }) {
 
   // Clientes
   const [customers, setCustomers] = useState(() => {
+    const isInit = localStorage.getItem('aj_system_initialized');
     const saved = localStorage.getItem('aj_customers');
-    return saved ? JSON.parse(saved) : [
+    if (saved !== null) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.warn('Error al leer aj_customers:', e);
+      }
+    }
+    if (isInit === 'true') return [];
+    return [
       { id: 'c1', name: 'Carlos Rodríguez', cedula: 'V-18452331', phone: '04141234567', visits: 4, notes: 'Cliente frecuente, prefiere poco suavizante' },
       { id: 'c2', name: 'María Fernández', cedula: 'V-20119854', phone: '04247654321', visits: 2, notes: 'Trae edredones dobles' },
       { id: 'c3', name: 'Línea de Transporte Unión', cedula: 'J-31456789-0', phone: '04129988776', visits: 5, notes: 'Forros de autobús completos' }
@@ -217,8 +228,18 @@ export function AppProvider({ children }) {
 
   // Órdenes / Tickets de Servicio
   const [orders, setOrders] = useState(() => {
+    const isInit = localStorage.getItem('aj_system_initialized');
     const saved = localStorage.getItem('aj_orders');
-    return saved ? JSON.parse(saved) : [
+    if (saved !== null) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.warn('Error al leer aj_orders:', e);
+      }
+    }
+    if (isInit === 'true') return [];
+    return [
       {
         id: 'AJ-101',
         customerName: 'Carlos Rodríguez',
@@ -252,8 +273,18 @@ export function AppProvider({ children }) {
 
   // Gastos Operativos
   const [expenses, setExpenses] = useState(() => {
+    const isInit = localStorage.getItem('aj_system_initialized');
     const saved = localStorage.getItem('aj_expenses');
-    return saved ? JSON.parse(saved) : [
+    if (saved !== null) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.warn('Error al leer aj_expenses:', e);
+      }
+    }
+    if (isInit === 'true') return [];
+    return [
       { id: 'e1', date: new Date().toISOString().split('T')[0], category: 'supplies', description: 'Cuñete de Jabón Líquido Industrial', amountUSD: 25.00, amountBs: 1012.50 },
       { id: 'e2', date: new Date().toISOString().split('T')[0], category: 'supplies', description: 'Galón de Suavizante Floral', amountUSD: 12.00, amountBs: 486.00 },
       { id: 'e3', date: new Date().toISOString().split('T')[0], category: 'maintenance', description: 'Repuesto correa para Lavadora #3', amountUSD: 8.00, amountBs: 324.00 }
@@ -291,17 +322,19 @@ export function AppProvider({ children }) {
 
   // Cuaderno Diario de Operaciones (Registros de clientes cargados por empleada/administrador)
   const [dailyRecords, setDailyRecords] = useState(() => {
+    const isInit = localStorage.getItem('aj_system_initialized');
     const saved = localStorage.getItem('aj_daily_records');
-    if (saved) {
+    if (saved !== null) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed.map(normalizeRecordServices);
         }
       } catch (e) {
         console.warn('Error al parsear aj_daily_records:', e);
       }
     }
+    if (isInit === 'true') return [];
     return [
       {
         id: 'rec_101',
@@ -454,8 +487,18 @@ export function AppProvider({ children }) {
 
   // Registro de Apertura de Detergentes (Jabón nuevo, suavizante nuevo, etc.)
   const [detergentLogs, setDetergentLogs] = useState(() => {
+    const isInit = localStorage.getItem('aj_system_initialized');
     const saved = localStorage.getItem('aj_detergent_logs');
-    return saved ? JSON.parse(saved) : [
+    if (saved !== null) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.warn('Error al leer aj_detergent_logs:', e);
+      }
+    }
+    if (isInit === 'true') return [];
+    return [
       { id: 'det_1', date: '2026-09-07', time: '12:18 PM', item: 'Jabón', notes: 'Abierto en turno orden #rec_103 (Abuela)', employee: 'Encargada' },
       { id: 'det_2', date: '2026-09-08', time: '09:30 AM', item: 'Suavizante', notes: 'Nuevo galón de suavizante floral', employee: 'Encargada' }
     ];
@@ -463,8 +506,18 @@ export function AppProvider({ children }) {
 
   // Historial de Cierres Diarios de Caja
   const [dailyClosures, setDailyClosures] = useState(() => {
+    const isInit = localStorage.getItem('aj_system_initialized');
     const saved = localStorage.getItem('aj_daily_closures');
-    return saved ? JSON.parse(saved) : [
+    if (saved !== null) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.warn('Error al leer aj_daily_closures:', e);
+      }
+    }
+    if (isInit === 'true') return [];
+    return [
       {
         id: 'close_0709',
         date: '2026-09-07',
@@ -545,13 +598,12 @@ export function AppProvider({ children }) {
     if (isConfigured) {
       // 1. Sincronización en vivo del Cuaderno Diario
       const unsubDaily = subscribeToCollection('daily_records', (cloudRecords) => {
-        if (cloudRecords && Array.isArray(cloudRecords) && cloudRecords.length > 0) {
-          setDailyRecords(prev => {
-            const currentList = Array.isArray(prev) ? prev.filter(r => r && r.id) : [];
-            const map = new Map(currentList.map(r => [String(r.id), r]));
-            cloudRecords.filter(cr => cr && cr.id).forEach(cr => {
+        if (Array.isArray(cloudRecords)) {
+          const isInit = localStorage.getItem('aj_system_initialized') === 'true';
+          if (cloudRecords.length > 0 || isInit) {
+            const normalized = cloudRecords.filter(cr => cr && cr.id).map(cr => {
               const norm = normalizeRecordServices(cr);
-              map.set(String(norm.id), {
+              return {
                 ...norm,
                 totalUSD: Number(norm.totalUSD) || 0,
                 totalBs: Number(norm.totalBs) || 0,
@@ -561,59 +613,74 @@ export function AppProvider({ children }) {
                 customerName: norm.customerName || 'Cliente sin nombre',
                 paymentStatus: norm.paymentStatus || 'pending',
                 deliveryStatus: norm.deliveryStatus || 'in_store'
-              });
-            });
-            const merged = Array.from(map.values()).sort((a, b) => {
+              };
+            }).sort((a, b) => {
               const dateA = String(a.date || '') + ' ' + String(a.time || '');
               const dateB = String(b.date || '') + ' ' + String(b.time || '');
               return dateB.localeCompare(dateA);
             });
-            return merged;
-          });
+            setDailyRecords(normalized);
+          }
         }
       });
 
-      // 2. Sincronización en vivo de Cierres Diarios
+      // 2. Sincronización en vivo de Órdenes
+      const unsubOrders = subscribeToCollection('orders', (cloudOrders) => {
+        if (Array.isArray(cloudOrders)) {
+          const isInit = localStorage.getItem('aj_system_initialized') === 'true';
+          if (cloudOrders.length > 0 || isInit) {
+            setOrders(cloudOrders.filter(o => o && o.id));
+          }
+        }
+      });
+
+      // 3. Sincronización en vivo de Cierres Diarios
       const unsubClosures = subscribeToCollection('daily_closures', (cloudClosures) => {
-        if (cloudClosures && Array.isArray(cloudClosures) && cloudClosures.length > 0) {
-          setDailyClosures(prev => {
-            const currentList = Array.isArray(prev) ? prev.filter(c => c && c.date) : [];
-            const map = new Map(currentList.map(c => [String(c.date), c]));
-            cloudClosures.filter(cc => cc && cc.date).forEach(cc => map.set(String(cc.date), cc));
-            return Array.from(map.values()).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-          });
+        if (Array.isArray(cloudClosures)) {
+          const isInit = localStorage.getItem('aj_system_initialized') === 'true';
+          if (cloudClosures.length > 0 || isInit) {
+            setDailyClosures(cloudClosures.filter(cc => cc && cc.date).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))));
+          }
         }
       });
 
-      // 3. Sincronización de Insumos / Detergentes
+      // 4. Sincronización de Insumos / Detergentes
       const unsubDetergents = subscribeToCollection('detergent_logs', (cloudLogs) => {
-        if (cloudLogs && cloudLogs.length > 0) {
-          setDetergentLogs(prev => {
-            const currentList = Array.isArray(prev) ? prev : [];
-            const map = new Map(currentList.map(d => [d.id, d]));
-            cloudLogs.forEach(cd => map.set(cd.id, cd));
-            return Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-          });
+        if (Array.isArray(cloudLogs)) {
+          const isInit = localStorage.getItem('aj_system_initialized') === 'true';
+          if (cloudLogs.length > 0 || isInit) {
+            setDetergentLogs(cloudLogs.filter(cd => cd && cd.id).sort((a, b) => (b.date || '').localeCompare(a.date || '')));
+          }
         }
       });
 
-      // 4. Sincronización de Gastos
+      // 5. Sincronización de Gastos
       const unsubExpenses = subscribeToCollection('expenses', (cloudExp) => {
-        if (cloudExp && cloudExp.length > 0) {
-          setExpenses(prev => {
-            const currentList = Array.isArray(prev) ? prev : [];
-            const map = new Map(currentList.map(e => [e.id, e]));
-            cloudExp.forEach(ce => map.set(ce.id, ce));
-            return Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-          });
+        if (Array.isArray(cloudExp)) {
+          const isInit = localStorage.getItem('aj_system_initialized') === 'true';
+          if (cloudExp.length > 0 || isInit) {
+            setExpenses(cloudExp.filter(ce => ce && ce.id).sort((a, b) => (b.date || '').localeCompare(a.date || '')));
+          }
+        }
+      });
+
+      // 6. Sincronización de Clientes
+      const unsubCustomers = subscribeToCollection('customers', (cloudCust) => {
+        if (Array.isArray(cloudCust)) {
+          const isInit = localStorage.getItem('aj_system_initialized') === 'true';
+          if (cloudCust.length > 0 || isInit) {
+            setCustomers(cloudCust.filter(c => c && c.id));
+          }
         }
       });
 
       return () => {
         unsubDaily();
+        unsubOrders();
         unsubClosures();
         unsubDetergents();
         unsubExpenses();
+        unsubCustomers();
       };
     }
   }, [isCloudConnected]);
@@ -661,7 +728,17 @@ export function AppProvider({ children }) {
         visits: 1,
         notes: 'Cliente registrado vía ticket'
       }]);
+      syncDocToCloud('customers', `c_${Date.now()}`, {
+        id: `c_${Date.now()}`,
+        name: orderWithId.customerName,
+        cedula: orderWithId.customerCedula || '',
+        phone: orderWithId.customerPhone || '',
+        visits: 1,
+        notes: 'Cliente registrado vía ticket'
+      });
     }
+
+    syncDocToCloud('orders', orderWithId.id, orderWithId);
 
     return orderWithId;
   };
@@ -702,6 +779,7 @@ export function AppProvider({ children }) {
       date: expense.date || new Date().toISOString().split('T')[0]
     };
     setExpenses([newExp, ...expenses]);
+    syncDocToCloud('expenses', newExp.id, newExp);
   };
 
   const addMaintenanceLog = (log) => {
@@ -1005,6 +1083,7 @@ export function AppProvider({ children }) {
       employee
     };
     setDetergentLogs([newLog, ...detergentLogs]);
+    syncDocToCloud('detergent_logs', newLog.id, newLog);
     return newLog;
   };
 
@@ -1029,6 +1108,98 @@ export function AppProvider({ children }) {
     });
     syncDocToCloud('daily_closures', newClosure.date, newClosure);
     return newClosure;
+  };
+
+  // Puesta a Cero Integral (Inicio de Operaciones Reales en Producción)
+  const resetSystemToCleanState = async (adminPassword, options = {}) => {
+    if (!verifyAdminPassword(adminPassword)) {
+      return { 
+        success: false, 
+        message: 'Contraseña de administrador incorrecta. Ingrese aj2026 o 1234.' 
+      };
+    }
+
+    const {
+      clearTickets = true,
+      clearClosures = true,
+      clearDetergents = true,
+      clearExpenses = true,
+      clearCustomers = false,
+      clearAudit = false
+    } = options;
+
+    try {
+      localStorage.setItem('aj_system_initialized', 'true');
+
+      if (clearTickets) {
+        setDailyRecords([]);
+        setOrders([]);
+        localStorage.setItem('aj_daily_records', JSON.stringify([]));
+        localStorage.setItem('aj_orders', JSON.stringify([]));
+        if (isCloudConnected) {
+          await clearCollectionFromCloud('daily_records');
+          await clearCollectionFromCloud('orders');
+        }
+      }
+
+      if (clearClosures) {
+        setDailyClosures([]);
+        localStorage.setItem('aj_daily_closures', JSON.stringify([]));
+        if (isCloudConnected) {
+          await clearCollectionFromCloud('daily_closures');
+        }
+      }
+
+      if (clearDetergents) {
+        setDetergentLogs([]);
+        localStorage.setItem('aj_detergent_logs', JSON.stringify([]));
+        if (isCloudConnected) {
+          await clearCollectionFromCloud('detergent_logs');
+        }
+      }
+
+      if (clearExpenses) {
+        setExpenses([]);
+        localStorage.setItem('aj_expenses', JSON.stringify([]));
+        if (isCloudConnected) {
+          await clearCollectionFromCloud('expenses');
+        }
+      }
+
+      if (clearCustomers) {
+        setCustomers([]);
+        localStorage.setItem('aj_customers', JSON.stringify([]));
+        if (isCloudConnected) {
+          await clearCollectionFromCloud('customers');
+        }
+      }
+
+      if (clearAudit) {
+        setAuditLogs([]);
+        localStorage.setItem('aj_audit_logs', JSON.stringify([]));
+      }
+
+      // Registro oficial en la Bitácora de Auditoría
+      logAuditAction({
+        action: 'PUESTA_A_CERO',
+        entityType: 'SISTEMA',
+        entityId: 'SYS_RESET',
+        reason: 'Puesta a cero autorizada para inicio de operaciones reales en lavandería',
+        performedBy: 'Administrador (Jeremy / Saul)',
+        details: `Tickets/Cuaderno: ${clearTickets ? 'Limpiados' : 'Conservados'} | Cierres: ${clearClosures ? 'Limpiados' : 'Conservados'} | Clientes: ${clearCustomers ? 'Limpiados' : 'Conservados'} | Insumos: ${clearDetergents ? 'Limpiados' : 'Conservados'} | Gastos: ${clearExpenses ? 'Limpiados' : 'Conservados'}.`
+      });
+
+      return {
+        success: true,
+        message: '¡El sistema ha sido puesto a cero exitosamente! Todos los registros de prueba han sido limpiados y el sistema está listo para operar.'
+      };
+    } catch (err) {
+      console.error('Error al poner a cero el sistema:', err);
+      return {
+        success: false,
+        message: 'Error al limpiar datos: ' + (err.message || err)
+      };
+    }
   };
 
   return (
@@ -1065,6 +1236,7 @@ export function AppProvider({ children }) {
       logAuditAction,
       addDetergentLog,
       saveDailyClosure,
+      resetSystemToCleanState,
       isCloudConnected,
       setIsCloudConnected,
       getFirebaseConfig
